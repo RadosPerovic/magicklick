@@ -1,0 +1,57 @@
+# Magic Klick
+
+Prezentacioni sajt i demo shop, napravljen u TypeScriptu i Reactu, sa Vinext/Vite okruženjem. Četiri stranice: početna, auto držači, moto držači i hooks.
+
+## Lokalni pregled
+
+Node.js 22.13 ili noviji. Iz ovog direktorijuma:
+
+```powershell
+npm install
+npm run dev
+```
+
+Pregled: http://127.0.0.1:5173
+
+Ako Windows npm launcher ne radi, koristi direktno instalirani CLI:
+
+```powershell
+node "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js" run dev
+```
+
+Provera i produkciona verzija:
+
+```powershell
+node node_modules/typescript/bin/tsc --noEmit
+node scripts/run-framework.mjs build
+```
+
+## Podešavanje sadržaja
+
+- `lib/catalog.ts`: proizvodi, cene, iznos dostave, prag besplatne dostave i fotografije.
+- `lib/orders.ts`: obračun, validacija i transport narudžbine. Demo popust iznosi 10% na glavni proizvod od 3 komada/kompleta/para; dodatni hooks par se obračunava jednom po porudžbini.
+- `components/magic/home.tsx` i `home-sections.tsx`: početna strana.
+- `components/magic/product-page.tsx`: zajednički prikaz proizvoda i forme.
+- `app/globals.css` i `app/magic-refinements.css`: boje, tipografija, raspored i animacije.
+
+## Demo poručivanje
+
+Svi iznosi i pogodnosti su demonstracioni. Nema naplate, emaila, slanja podataka na server ili čuvanja u browser storage-u. Podaci ostaju u React stanju otvorene stranice. Pregled sadrži fiksni snimak podataka pre potvrde; potvrda dobija jedinstveni `MK-DEMO` broj.
+
+`OrderTransport` je mesto za kasniju integraciju sa backendom. Pri uključivanju pravog poručivanja potrebno je zameniti `submitDemoOrder`, obračun i validaciju ponoviti na serveru, dodati slanje emaila na serveru, stvarni cenovnik i uslove dostave. Tajne i email ključevi ne idu u klijentski kod.
+
+## Izvori fotografija i sadržaja
+
+Originalne fotografije lokalno su sačuvane sa javnog profila https://www.instagram.com/magic.klick/ (pregledan 6. oktobra 2026). Ne zavise od privremenih Instagram CDN linkova. Profil navodi proizvodnju u Srbiji i preuzimanje u Novom Beogradu, Zemunu i Smederevu.
+
+- `19732bf2609aa5d1.jpg`: auto i moto pakovanja.
+- `1c2941a8b6af1f88.jpg`: moto držač i pakovanje.
+- `aa882e105ac50c86.jpg`: hooks i auto pakovanja.
+- `f6a1a55882e760cf.jpg`: detalj tablice bez rama.
+- `6954117d5e2414fb.jpg`, `7420fc7753605727.jpg`, `3858937ab5ff7d4f.jpg`, `df6b22664384b3c8.jpg`: fotografije vozila i kompleta.
+
+Raspored je inspirisan Fultala referencom https://htmldemo.net/fultala/fultala/index.html. Implementacija je sopstvena, bez kopiranja plaćenog izvornog koda. Poređenje sa ramom je označena ilustrativna simulacija preko originalne fotografije.
+
+## Provereno
+
+TypeScript provera, produkcioni build, navigacija kroz sve tri kategorije, desktop i mobilni prikaz, učitavanje slika, količina i prateći proizvod, popust i besplatna dostava, preuzimanje i lokacije, validacija prazne forme, pregled i potvrda demo porudžbine. WebMCP kalkulator je proveren validnim unosom i odbijanjem količine 0.
