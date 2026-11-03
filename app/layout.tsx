@@ -7,9 +7,6 @@ import "./magic-refinements.css";
 export const metadata: Metadata = {
   title: "MAGic KLICK — Mali detalj. Velika razlika.",
   description: "Držači za tablice bez rama, držači za motor i hooks za sedišta. Proizvedeno u Srbiji. Otkrij svoj MAGic KLICK.",
-  other: {
-    "codex-preview": "development",
-  },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
