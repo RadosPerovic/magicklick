@@ -1,6 +1,6 @@
-# Magic Klick
+# MAGic KLICK
 
-Prezentacioni sajt i demo shop, napravljen u TypeScriptu i Reactu, sa Vinext/Vite okruženjem. Četiri stranice: početna, auto držači, moto držači i hooks.
+Prezentacioni sajt i demo shop, napravljen u TypeScriptu i Reactu, sa Vinext/Vite okruženjem. Pet stranica: početna, auto držači, moto držači, hooks i zasebna korpa (`/korpa`).
 
 ## Lokalni pregled
 
@@ -23,22 +23,25 @@ Provera i produkciona verzija:
 
 ```powershell
 node node_modules/typescript/bin/tsc --noEmit
+node scripts/check-cart.mjs
 node scripts/run-framework.mjs build
 ```
 
 ## Podešavanje sadržaja
 
 - `lib/catalog.ts`: proizvodi, cene, iznos dostave, prag besplatne dostave i fotografije.
-- `lib/orders.ts`: obračun, validacija i transport narudžbine. Demo popust iznosi 10% na glavni proizvod od 3 komada/kompleta/para; dodatni hooks par se obračunava jednom po porudžbini.
+- `lib/orders.ts`: obračun, validacija i transport narudžbine. Cena proizvoda množi se količinom bez količinskog popusta; dodatni hooks par se obračunava jednom uz izabrani proizvod (300 RSD uz auto držač).
 - `components/magic/home.tsx` i `home-sections.tsx`: početna strana.
-- `components/magic/product-page.tsx`: zajednički prikaz proizvoda i forme.
+- `components/magic/product-page.tsx`: prikaz proizvoda, količina i dodavanje u korpu.
+- `components/magic/cart-page.tsx`: zasebna korpa, unos podataka i demo potvrda.
+- `lib/cart.ts` i `components/magic/cart-context.tsx`: stavke korpe, zajednički obračun i čuvanje izbora.
 - `app/globals.css` i `app/magic-refinements.css`: boje, tipografija, raspored i animacije.
 
 ## Demo poručivanje
 
-Svi iznosi i pogodnosti su demonstracioni. Nema naplate, emaila, slanja podataka na server ili čuvanja u browser storage-u. Podaci ostaju u React stanju otvorene stranice. Pregled sadrži fiksni snimak podataka pre potvrde; potvrda dobija jedinstveni `MK-DEMO` broj.
+Svi iznosi i pogodnosti su demonstracioni. Nema naplate, emaila ili slanja podataka na server. U sessionStorage čuvaju se samo proizvodi, količine i izbor dodatnih kukica, kako bi korpa ostala dostupna pri navigaciji i osvežavanju. Lični podaci ostaju isključivo u React stanju stranice korpe. Dostava se u korpi prikazuje tek nakon validnog unosa podataka i obračunava jednom na zbir svih proizvoda. Pregled sadrži fiksni snimak podataka pre potvrde; potvrda dobija jedinstveni `MK-DEMO` broj.
 
-`OrderTransport` je mesto za kasniju integraciju sa backendom. Pri uključivanju pravog poručivanja potrebno je zameniti `submitDemoOrder`, obračun i validaciju ponoviti na serveru, dodati slanje emaila na serveru, stvarni cenovnik i uslove dostave. Tajne i email ključevi ne idu u klijentski kod.
+Slanje stvarnih porudžbina na `magicklick.rs@gmail.com` pripremljeno je preko serverske rute `/api/orders` i Resenda. Bez aktivne konfiguracije ostaje demo režim. Za povezivanje servisa i uključivanje pogledaj [EMAIL-SETUP.md](EMAIL-SETUP.md). Tajne i email ključevi ne idu u klijentski kod.
 
 ## Izvori fotografija i sadržaja
 
@@ -54,4 +57,4 @@ Raspored je inspirisan Fultala referencom https://htmldemo.net/fultala/fultala/i
 
 ## Provereno
 
-TypeScript provera, produkcioni build, navigacija kroz sve tri kategorije, desktop i mobilni prikaz, učitavanje slika, količina i prateći proizvod, popust i besplatna dostava, preuzimanje i lokacije, validacija prazne forme, pregled i potvrda demo porudžbine. WebMCP kalkulator je proveren validnim unosom i odbijanjem količine 0.
+TypeScript provera, produkcioni build, navigacija kroz sve tri kategorije, desktop i mobilni prikaz, učitavanje slika, količina i prateći proizvod, besplatna dostava, preuzimanje i lokacije, validacija prazne forme, pregled i potvrda demo porudžbine. WebMCP kalkulator je proveren validnim unosom i odbijanjem količine 0.
