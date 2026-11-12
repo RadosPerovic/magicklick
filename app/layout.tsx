@@ -3,6 +3,7 @@ import { CartProvider } from "@/components/magic/cart-context";
 import { OrderModeProvider } from "@/components/magic/order-mode";
 import "./globals.css";
 import "./magic-refinements.css";
+import "./magic-mobile.css";
 
 export const metadata: Metadata = {
   title: "MAGic KLICK — Mali detalj. Velika razlika.",

@@ -12,11 +12,11 @@ Pripremljeno za Resend. Primalac je fiksno podešen na **magicklick.rs@gmail.com
 
 Gmail adresa prima email; ona ne mora biti adresa pošiljaoca. Za proizvoljno slanje preko Resenda koristi potvrđen domen pošiljaoca. Test domen `resend.dev` ima ograničenja primaoca; proveri ih u svom Resend nalogu. Za rad ovog sajta ne treba Gmail lozinka.
 
-Dok nedostaje ključ/adresa ili `ORDERS_ENABLED` nije `true`, sajt ostaje u jasno označenom demo režimu. Demo porudžbine se ne šalju. Ako je slanje uključeno, ali servis prijavi grešku, kupac dobija poruku o neuspehu i korpa ostaje sačuvana. Uspešna potvrda se prikazuje tek kada servis prihvati email; to samo po sebi nije potvrda da je email stigao u Inbox.
+Dok nedostaje ključ/adresa ili `ORDERS_ENABLED` nije `true`, kupac može da pregleda korpu i podatke, ali je potvrda slanja onemogućena. U pregledu je ponuđeno poručivanje preko Instagrama. Ako je slanje uključeno, ali servis prijavi grešku, kupac dobija poruku o neuspehu i korpa ostaje sačuvana. Uspešna potvrda se prikazuje tek kada servis prihvati email; to samo po sebi nije potvrda da je email stigao u Inbox.
 
 ## Šta stiže u email
 
-Broj porudžbine, proizvodi, količine, dodatne kukice, zbir proizvoda, poštarina, ukupan iznos, ime, telefon, opcioni email, način dostave, odgovarajući podaci za isporuku i napomena. Cene i poštarina se ponovo računaju na serveru. Kupcu se ne šalje automatski email.
+Broj porudžbine, proizvodi, količine, dodatne kukice, zbir proizvoda, poštarina, ukupan iznos, ime, telefon, obavezni email, način dostave, odgovarajući podaci za isporuku i napomena. Cene i poštarina se ponovo računaju na serveru. Kupcu se ne šalje automatski email.
 
 Isti pokušaj slanja koristi stabilan Resend idempotency ključ, kako ponovni klik nakon mrežne greške ne bi napravio dupli email u okviru Resendovog perioda od 24 sata. Ako se vraćaš na izmenu podataka i ponovo potvrđuješ pregled, to je nov pokušaj porudžbine.
 
