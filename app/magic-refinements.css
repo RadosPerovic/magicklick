@@ -58,6 +58,19 @@
 @media(max-width:550px){.hero.hero-with-video{padding-right:0;gap:0}.hero-photo.hero-video{width:min(calc(100% - 40px),300px);height:auto;margin:0 auto 24px}}
 .photo-caption{bottom:32px}.photo-caption strong{font-size:28px;text-shadow:0 2px 10px #0004}
 #kolekcija .product-card-image{height:auto;aspect-ratio:3/4;background:#fff}#kolekcija .product-card-image>img{object-fit:contain;object-position:center}#kolekcija .product-card:hover .product-card-image>img{transform:none}
+/* Keep the name and price on the same text baseline at every screen size. */
+#kolekcija .product-info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: baseline;
+  gap: 6px 12px;
+  text-align: left;
+}
+#kolekcija .product-kicker { grid-column: 1 / -1; }
+#kolekcija .product-card-copy { min-width: 0; max-width: none; text-align: left; }
+#kolekcija .product-info h3 { margin: 0 0 8px; }
+#kolekcija .product-price { padding-top: 0; text-align: right; white-space: nowrap; line-height: 1.25; }
+#kolekcija .product-price small { margin-top: 0; line-height: 1.1; }
 .story-visual{height:540px}.story-visual>img{object-fit:cover;object-position:center}
 .story-visual.story-carousel{width:100%;max-width:420px;height:auto;aspect-ratio:3/4;justify-self:center}.story-carousel>img{position:absolute;inset:0;object-position:50% 60%}.story-carousel>button{position:absolute;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid #fff8;border-radius:50%;background:#171717a6;color:#fff}.story-carousel>button:hover{background:#171717}.story-carousel>button:focus-visible{outline-color:#fff}.story-carousel-prev{left:12px}.story-carousel-next{right:12px}
 @media(min-width:1500px){.hero-photo>img{top:-115px}}
@@ -150,3 +163,47 @@
 .story-social{border-top:1px solid #ddd;padding-top:15px}.story-social p{margin:0 0 6px}
 .gallery-credit-link{color:var(--burgundy);font-weight:600}
 .gallery-credit-link:hover,.gallery-credit-link:focus-visible{text-decoration:underline}
+
+/* A shared vertical rhythm that scales from phones to desktop screens. */
+:root { --section-space: clamp(40px, 5vw, 64px); }
+.section,
+.story-section,
+.order-section { padding-block: var(--section-space); }
+.section-heading { margin-bottom: clamp(22px, 2.5vw, 30px); }
+.hero-copy { padding-top: 72px; padding-bottom: 52px; }
+.hero h1 { margin-bottom: 16px; }
+.hero-copy > p { margin-bottom: 24px; }
+.hero-foot { margin-top: clamp(18px, 2.5vw, 30px); }
+.benefits { padding-block: clamp(20px, 2vw, 26px); }
+.story-copy h2 { margin: 16px 0 22px; }
+.story-copy ul { margin: 20px 0 26px; }
+.faq-section > div > p { margin-block: 18px; }
+.page-intro-compact { padding-block: 14px 18px; }
+.page-intro-compact .breadcrumbs { margin-bottom: 10px; }
+.page-intro-compact h1 { margin-block: 8px 6px; }
+.product-detail {
+  padding-top: clamp(28px, 3.5vw, 48px);
+  padding-bottom: clamp(32px, 4vw, 48px);
+}
+.product-config h2 { margin-block: 14px; }
+.detail-price { margin-block: 20px 18px; }
+.config-benefits { margin-block: 12px 18px; }
+.quick-quote { margin-block: 18px 12px; }
+.product-tabs-section { padding-bottom: clamp(32px, 4vw, 48px); }
+.tab-content { padding-top: 18px; }
+.installation-videos {
+  padding-top: clamp(22px, 2.5vw, 30px);
+  padding-bottom: clamp(32px, 4vw, 48px);
+  margin-bottom: 0;
+}
+.order-grid { margin-top: clamp(24px, 3vw, 34px); }
+.cart-empty { padding-block: 48px 56px; }
+.related-section { padding-bottom: var(--section-space); }
+footer { padding-top: clamp(36px, 4vw, 48px); }
+.footer-grid h4 { margin-bottom: 18px; }
+.footer-grid p { margin-block: 18px 14px; }
+.footer-follow { margin-top: 22px; }
+.footer-follow + .footer-bottom { margin-top: 10px; }
+@media (max-width: 550px) {
+  .page-intro-compact { padding-block: 12px 16px; }
+}

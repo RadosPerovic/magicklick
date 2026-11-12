@@ -82,7 +82,7 @@
   .hero-copy {
     width: min(100%, 680px);
     margin-inline: auto;
-    padding: clamp(32px, 7vw, 52px) var(--mobile-gutter);
+    padding: clamp(24px, 4vw, 36px) var(--mobile-gutter);
     text-align: center;
   }
 
@@ -113,7 +113,7 @@
   .hero-photo.hero-video {
     width: min(calc(100% - var(--mobile-gutter) * 2), 320px);
     justify-self: center;
-    margin: 0 auto clamp(24px, 5vw, 40px);
+    margin: 0 auto clamp(18px, 3vw, 28px);
   }
 
   .section-heading,
@@ -144,6 +144,7 @@
   .product-info { flex-direction: column; align-items: center; text-align: center; gap: 12px; }
   .product-info > div { max-width: 100%; }
   .product-price { text-align: center; }
+  #kolekcija .product-kicker { text-align: center; }
 
   .story-grid {
     grid-template-columns: minmax(0, 1fr);
