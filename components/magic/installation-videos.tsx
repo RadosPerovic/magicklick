@@ -1,13 +1,68 @@
 "use client";
 
 import { Camera, Heart, Play } from "lucide-react";
-import { useState } from "react";
-import { imagePath } from "@/lib/catalog";
+import { useRef, useState } from "react";
 
-const autoPreviews = [
-  { title: "Prednja tablica", image: "f6a1a55882e760cf", number: "01" },
-  { title: "Zadnja tablica", image: "df6b22664384b3c8", number: "02" },
+interface AutoInstallationVideoProps {
+  label: string;
+  poster: string;
+  src?: string;
+}
+
+const autoVideos: AutoInstallationVideoProps[] = [
+  { label: "Video montaže 1", poster: "/images/auto-montaza-01-poster.jpg", src: "/videos/auto-montaza-01-bez-zvuka.mp4" },
+  { label: "Video montaže 2", poster: "/images/auto-montaza-02-poster.jpg", src: "/videos/auto-montaza-02-bez-zvuka.mp4" },
+  { label: "Video montaže 3", poster: "/images/auto-montaza-03-poster.jpg", src: "/videos/auto-montaza-03-bez-zvuka.mp4" },
 ];
+
+function InstallationVideoPlayer({ label, poster, src, width, height }: {
+  label: string; poster: string; src: string; width: number; height: number;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  return (
+    <div className="installation-video-poster installation-video-ready" style={{ aspectRatio: `${width}/${height}` }}>
+      <video ref={videoRef} className="installation-video-player" src={src} poster={poster}
+        width={width} height={height} controls muted playsInline preload="none" aria-label={label}
+        onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)}>
+        Tvoj pregledač ne podržava video. <a href={src}>Otvori snimak</a>.
+      </video>
+      {!playing && (
+        <button type="button" className="installation-video-play" aria-label={`Pusti: ${label}`}
+          onClick={() => { void videoRef.current?.play().catch(() => {}); }}>
+          <Play size={28} fill="currentColor" strokeWidth={1} aria-hidden="true"/>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AutoInstallationVideo({ label, poster, src }: AutoInstallationVideoProps) {
+  const [liked, setLiked] = useState(false);
+
+  return (
+    <article className="installation-video-card" aria-label={label}>
+      {src ? <InstallationVideoPlayer label={label} poster={poster} src={src} width={720} height={1280}/> : (
+        <div className="installation-video-poster">
+          <img src={poster} alt="" loading="lazy"/>
+          <button type="button" className="installation-video-play" disabled
+            aria-label={`${label} — snimak još nije dodat`}>
+            <Play size={28} fill="currentColor" strokeWidth={1} aria-hidden="true"/>
+          </button>
+        </div>
+      )}
+      <div className="installation-video-social">
+        <button type="button" className="installation-video-like"
+          aria-label={`Sviđa mi se: ${label}`} aria-pressed={liked}
+          onClick={() => setLiked((current) => !current)}>
+          <Heart size={22} fill={liked ? "currentColor" : "none"} aria-hidden="true"/>
+        </button>
+        <p>Originalni video sa <a href="https://www.instagram.com/magic.klick/" target="_blank" rel="noreferrer">@magic.klick</a> profila.</p>
+      </div>
+    </article>
+  );
+}
 
 export function InstallationVideos({ productId = "auto" }: { productId?: "auto" | "moto" }) {
   const isMoto = productId === "moto";
@@ -21,23 +76,16 @@ export function InstallationVideos({ productId = "auto" }: { productId?: "auto" 
           </div>
           <p>{isMoto ? "Video vodič za postavljanje MAGic KLICK držača na registarsku tablicu motocikla." : <>Video vodiči za postavljanje MAGic KLICK držača<br className="desktop-break"/> na prednju i zadnju tablicu automobila.</>}</p>
         </div>
-        <div className={`installation-video-grid${isMoto ? " installation-video-grid-single" : ""}`}>
+        <div className={`installation-video-grid${isMoto ? " installation-video-grid-single" : " installation-video-grid-auto"}`}>
           {isMoto ? (
             <article className="installation-video-card">
-              <video
-                className="installation-video-player"
+              <InstallationVideoPlayer
                 src="/videos/moto-montaza-bez-zvuka.mp4"
                 poster="/images/moto-montaza-poster.jpg"
                 width={1280}
                 height={738}
-                controls
-                muted
-                playsInline
-                preload="none"
-                aria-label="Montaža MAGic KLICK držača na motociklu"
-              >
-                Tvoj pregledač ne podržava video. <a href="/videos/moto-montaza-bez-zvuka.mp4">Otvori snimak</a>.
-              </video>
+                label="Montaža MAGic KLICK držača na motociklu"
+              />
               <div className="installation-video-social">
                 <button
                   type="button"
@@ -51,24 +99,12 @@ export function InstallationVideos({ productId = "auto" }: { productId?: "auto" 
                 <p>Za još videa pogledaj naš Instagram <a href="https://www.instagram.com/magic.klick/" target="_blank" rel="noreferrer">@magic.klick</a>.</p>
               </div>
             </article>
-          ) : autoPreviews.map((preview) => (
-            <article className="installation-video-card" key={preview.number}>
-              <div className="installation-video-poster">
-                <img src={imagePath(preview.image)} alt="" loading="lazy"/>
-                <span className="installation-video-status">VIDEO USKORO</span>
-                <span className="installation-video-play" aria-hidden="true"><Play size={28} fill="currentColor" strokeWidth={1}/></span>
-                <div className="installation-video-caption">
-                  <span>MONTAŽA · {preview.number}</span>
-                  <h3>{preview.title}</h3>
-                </div>
-              </div>
-              <div className="installation-video-footer"><Camera size={16} aria-hidden="true"/><span>@magic.klick</span><span>Demo prikaz</span></div>
-            </article>
+          ) : autoVideos.map((video) => (
+            <AutoInstallationVideo key={video.label} {...video}/>
           ))}
         </div>
         {!isMoto && (
           <div className="installation-video-note">
-            <p>Uskoro ovde možeš da pogledaš video uputstva za montažu.</p>
             <a href="https://www.instagram.com/magic.klick/" className="text-link" target="_blank" rel="noreferrer">Za još videa poseti naš Instagram <Camera size={15} aria-hidden="true"/></a>
           </div>
         )}

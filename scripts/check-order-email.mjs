@@ -68,13 +68,13 @@ await handleOrderRequest(request(), config, accept);
 assert.equal(sent[0].headers["Idempotency-Key"], sent[1].headers["Idempotency-Key"]);
 assert.deepEqual(sent[0].body, sent[1].body); // Retries produce identical provider payloads.
 
-const postalPayload = { ...payload, delivery: "post-office", customer: { ...payload.customer, city: "", address: "", email: "" } };
+const postalPayload = { ...payload, delivery: "post-office", customer: { ...payload.customer, city: "", address: "" } };
 const postalResponse = await handleOrderRequest(request(postalPayload), config, accept);
 assert.equal(postalResponse.status, 200);
 assert.equal((await postalResponse.json()).total, 4280);
 assert(sent.at(-1).body.text.includes(`Poštarina: ${new Intl.NumberFormat("sr-RS").format(480)} RSD`));
 assert(sent.at(-1).body.text.includes("preuzimanje u pošti"));
-assert(!("reply_to" in sent.at(-1).body));
+assert.equal(sent.at(-1).body.reply_to, "test@example.com");
 const invalidBodies = [
   {}, { ...payload, items: [] }, { ...payload, items: [payload.items[0], payload.items[0]] },
   { ...payload, items: [{ productId: "auto", quantity: 0, hooks: false }] },
@@ -84,6 +84,7 @@ const invalidBodies = [
   { ...postalPayload, customer: { ...postalPayload.customer, postalCode: "" } },
   { ...payload, customer: { ...payload.customer, address: "" } },
   { ...payload, customer: { ...payload.customer, email: "bad\r\nBcc: other@example.com" } },
+  ...["courier", "post-office"].flatMap(delivery => ["", "   ", "pogresna-adresa"].map(email => ({ ...payload, delivery, customer: { ...payload.customer, email } }))),
 ];
 const beforeInvalid = sent.length;
 for (const body of invalidBodies) assert.equal((await handleOrderRequest(request(body), config, accept)).status, 400);

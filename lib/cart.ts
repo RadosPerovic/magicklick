@@ -1,5 +1,5 @@
 import { products, shipping, type ProductId } from "./catalog";
-import { calculateQuote, validateCustomer, type Customer, type OrderConfig, type OrderReceipt } from "./orders";
+import { calculateQuote, type Customer, type OrderConfig } from "./orders";
 
 export interface CartItem { productId: ProductId; quantity: number; hooks: boolean; }
 export interface CartQuote { productTotal: number; extras: number; subtotal: number; delivery: number; total: number; }
@@ -37,10 +37,3 @@ export function calculateCartQuote(items: CartItem[], delivery: OrderConfig["del
   return { productTotal, extras, subtotal, delivery: deliveryCost, total: subtotal + deliveryCost };
 }
 
-export async function submitDemoCartOrder(payload: CartPayload): Promise<OrderReceipt> {
-  if (!payload.items.length || Object.keys(validateCustomer(payload.customer, payload.delivery)).length) throw new Error("Proveri podatke za porudžbinu.");
-  if (payload.delivery === "pickup" && !["Novi Beograd", "Zemun", "Smederevo"].includes(payload.pickupLocation)) throw new Error("Izaberi lokaciju preuzimanja.");
-  const quote = calculateCartQuote(payload.items, payload.delivery);
-  await new Promise(resolve => setTimeout(resolve, 700));
-  return { id: `MK-DEMO-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, createdAt: new Date().toISOString(), mode: "demo", total: quote.total };
-}

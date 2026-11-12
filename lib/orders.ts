@@ -16,7 +16,8 @@ export function validateCustomer(customer: Customer, delivery: OrderConfig["deli
  if(customer.name.trim().length<3)errors.name="Unesi ime i prezime (najmanje 3 znaka).";
  const digits=customer.phone.replace(/\D/g,"");
  if(!/^\+?[\d\s()-]+$/.test(customer.phone.trim()) || digits.length<7 || digits.length>15)errors.phone="Unesi ispravan broj telefona, npr. 064 123 4567.";
- if(customer.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email))errors.email="Proveri email adresu ili ostavi polje prazno.";
+ if(!customer.email.trim())errors.email="Unesi email adresu.";
+ else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email))errors.email="Unesi ispravnu email adresu.";
  if(delivery==="courier" || delivery==="post-office"){
   if(!/^\d{5}$/.test(customer.postalCode.trim()))errors.postalCode="Unesi petocifreni poštanski broj.";
  }
@@ -26,14 +27,4 @@ export function validateCustomer(customer: Customer, delivery: OrderConfig["deli
  }
  return errors;
 }
-export interface OrderPayload { config: OrderConfig; customer: Customer; quote: Quote; }
-export interface OrderReceipt { id: string; createdAt: string; mode: "demo" | "live"; total: number; }
-// Replace this transport with your own backend adapter when real orders are enabled.
-// The demo adapter makes no network requests, sends no email and stores no customer data.
-export type OrderTransport = (payload: OrderPayload) => Promise<OrderReceipt>;
-export const submitDemoOrder: OrderTransport = async (payload) => {
- if(Object.keys(validateCustomer(payload.customer,payload.config.delivery)).length)throw new Error("Proveri podatke za porudžbinu.");
- const quote=calculateQuote(payload.config);
- await new Promise(resolve=>setTimeout(resolve,700));
- return {id:`MK-DEMO-${crypto.randomUUID().slice(0,8).toUpperCase()}`,createdAt:new Date().toISOString(),mode:"demo",total:quote.total};
-};
+export interface OrderReceipt { id: string; createdAt: string; mode: "live"; total: number; }
