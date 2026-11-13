@@ -153,9 +153,15 @@
   }
   .story-copy,
   .story-social { width: 100%; text-align: center; }
-  .story-copy ul { padding-inline: 0; }
-  .story-copy li { justify-content: center; }
-  .story-copy li > svg { flex-shrink: 0; }
+  .story-copy ul { width: fit-content; max-width: 100%; margin-inline: auto; padding-inline: 0; }
+  .story-copy li {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr);
+    align-items: start;
+    text-align: left;
+    line-height: 1.65;
+  }
+  .story-copy li > svg { margin-top: calc((1.65em - 16px) / 2); }
   .story-social-desktop { display: none; }
   .story-social-mobile { display: block; }
   .story-visual.story-carousel { margin-inline: auto; }
