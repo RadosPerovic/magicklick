@@ -1,21 +1,24 @@
-import { handleOrderRequest, ordersEnabled, type OrderEmailConfig } from "@/lib/order-email.server";
+import { handleOrderRequest } from "@/lib/order-email.server";
+import type { OrderSubmissionService } from "@/lib/order-dispatcher.server";
 
 export const dynamic = "force-dynamic";
 
-function orderEmailConfig(): OrderEmailConfig {
-  if (process.env.VERCEL === "1") return {};
-
-  return {
-    ORDERS_ENABLED: process.env.ORDERS_ENABLED,
-    RESEND_API_KEY: process.env.RESEND_API_KEY,
-    ORDER_EMAIL_FROM: process.env.ORDER_EMAIL_FROM,
-  };
+async function orderService(): Promise<OrderSubmissionService | null> {
+  // Replaced at build time. The Worker build excludes Node SMTP and secret files.
+  if (!__MAGIC_KLICK_NODE__) return null;
+  try {
+    const { getOrderService } = await import("@/lib/order-runtime.server");
+    return getOrderService();
+  } catch {
+    console.error("[order-email]", { code: "email_configuration_invalid" });
+    return null;
+  }
 }
 
-export function GET() {
-  return Response.json({ enabled: ordersEnabled(orderEmailConfig()) }, { headers: { "Cache-Control": "no-store" } });
+export async function GET() {
+  return Response.json({ enabled: !!(await orderService()) }, { headers: { "Cache-Control": "no-store" } });
 }
 
-export function POST(request: Request) {
-  return handleOrderRequest(request, orderEmailConfig());
+export async function POST(request: Request) {
+  return handleOrderRequest(request, await orderService());
 }

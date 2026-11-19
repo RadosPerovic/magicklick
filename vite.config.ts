@@ -13,6 +13,14 @@ const localBindingConfig = {
 };
 
 export default defineConfig(async ({ command }) => {
+  const nodeBackend = process.env.MAGIC_KLICK_RUNTIME === "node";
+  if (nodeBackend) {
+    return {
+      define: { __MAGIC_KLICK_NODE__: "true" },
+      plugins: [vinext()],
+      ssr: { external: ["nodemailer"] },
+    };
+  }
   // Use Miniflare's local Request.cf placeholder unless fetching is requested.
   process.env.CLOUDFLARE_CF_FETCH_ENABLED ??= "false";
   process.env.WRANGLER_SEND_METRICS ??= "false";
@@ -28,6 +36,7 @@ export default defineConfig(async ({ command }) => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    define: { __MAGIC_KLICK_NODE__: "false" },
     server: {
       ...(managedLinux
         ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }

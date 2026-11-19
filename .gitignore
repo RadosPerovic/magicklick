@@ -48,3 +48,11 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+
+# Keep other private files ignored; this SMTP config is versioned by request.
+/private/*
+**/order-email.json
+!/private/order-email.json
+
+# Runtime customer records must never be packaged with application source.
+**/orders/

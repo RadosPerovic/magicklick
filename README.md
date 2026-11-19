@@ -31,6 +31,7 @@ node scripts/run-framework.mjs build
 
 - `lib/catalog.ts`: proizvodi, cene, iznos dostave, prag besplatne dostave i fotografije.
 - `lib/orders.ts`: obračun, validacija i transport narudžbine. Cena proizvoda množi se količinom bez količinskog popusta; dodatni hooks par se obračunava jednom uz izabrani proizvod (300 RSD uz auto držač).
+- `lib/order-record.server.ts`: obavezna mesečna TXT evidencija van aplikacije, upis pre emailova i redni brojevi po mesecu.
 - `components/magic/home.tsx` i `home-sections.tsx`: početna strana.
 - `components/magic/product-page.tsx`: prikaz proizvoda, količina i dodavanje u korpu.
 - `components/magic/cart-page.tsx`: zasebna korpa, unos podataka, pregled i potvrda porudžbine.
@@ -39,9 +40,9 @@ node scripts/run-framework.mjs build
 
 ## Poručivanje
 
-U sessionStorage čuvaju se samo proizvodi, količine i izbor dodatnih kukica, kako bi korpa ostala dostupna pri navigaciji i osvežavanju. Podaci kupca ostaju u React stanju stranice korpe do potvrde slanja. Email je obavezno polje. Dostava se u korpi prikazuje tek nakon validnog unosa podataka i obračunava jednom na zbir svih proizvoda. Pregled sadrži fiksni snimak podataka pre potvrde. Uspeh i jedinstveni broj porudžbine prikazuju se tek nakon odgovora servera koji potvrđuje da je email servis prihvatio porudžbinu. Nema online naplate.
+U sessionStorage čuvaju se samo proizvodi, količine i izbor dodatnih kukica, kako bi korpa ostala dostupna pri navigaciji i osvežavanju. Podaci kupca ostaju u React stanju stranice korpe do potvrde slanja. Email je obavezno polje. Dostava se u korpi prikazuje tek nakon validnog unosa podataka i obračunava jednom na zbir svih proizvoda. Pregled sadrži fiksni snimak podataka pre potvrde. Pre bilo kog emaila server mora uspešno da upiše porudžbinu u mesečni `.txt` fajl u privatnom `orders` folderu van aplikacije. Uspeh i jedinstveni broj porudžbine prikazuju se kada potom DreamWeb SMTP prihvati interni email. Nema baze porudžbina ni online naplate.
 
-Slanje porudžbina na `magicklick.rs@gmail.com` pripremljeno je preko serverske rute `/api/orders` i Resenda. Bez aktivne konfiguracije potvrda slanja je onemogućena, a kupcu je ponuđeno poručivanje preko Instagrama. Ne postoji lokalna zamena za uspešnu serversku potvrdu. Za povezivanje servisa i uključivanje pogledaj [EMAIL-SETUP.md](EMAIL-SETUP.md). Tajne i email ključevi ne idu u klijentski kod.
+Serverska ruta `/api/orders` šalje dve zasebne HTML/tekstualne poruke: potvrdu kupcu i obaveštenje na adresu iz konfiguracije (početno `orders@magic-klick.rs`). SMTP radi u Node.js profilu: `npm run dev:node`, odnosno `npm run build:node` i `npm run start:node` za produkciju. Postojeći Cloudflare/Sites profil ostaje za pregled, sa poručivanjem isključenim. Bez aktivne konfiguracije kupcu je ponuđeno poručivanje preko Instagrama. Za privatni konfiguracioni fajl, produkciju i ograničenja zaštite od duplikata pogledaj [EMAIL-SETUP.md](EMAIL-SETUP.md). SMTP autentifikacija izvršava se samo na serveru.
 
 ## Izvori fotografija i sadržaja
 

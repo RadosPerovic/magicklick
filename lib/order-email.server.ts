@@ -1,18 +1,9 @@
 import { z } from "zod";
-import { calculateCartQuote, type CartPayload } from "./cart";
-import { products, formatPrice, autoHooksPromoPrice } from "./catalog";
-import { validateCustomer, type OrderReceipt } from "./orders";
-
-export interface OrderEmailConfig {
-  ORDERS_ENABLED?: string;
-  RESEND_API_KEY?: string;
-  ORDER_EMAIL_FROM?: string;
-}
-
-// Recipient and provider credentials are used exclusively by the server.
-const recipient = "magicklick.rs@gmail.com";
+import { type CartPayload } from "./cart";
+import { validateCustomer } from "./orders";
+import { OrderCapacityError, OrderConflictError, OrderRecordError, type OrderSubmissionService } from "./order-dispatcher.server";
 const submissionSchema = z.object({
-  requestId: z.string().uuid(),
+  requestId: z.string().uuid().transform(value => value.toLowerCase()),
   items: z.array(z.object({
     productId: z.enum(["auto", "moto", "hooks"]),
     quantity: z.number().int().min(1).max(20),
@@ -22,7 +13,7 @@ const submissionSchema = z.object({
   customer: z.object({
     name: z.string().trim().min(3).max(120),
     phone: z.string().trim().max(40),
-    email: z.string().trim().max(254),
+    email: z.string().trim().email().max(254).regex(/^[^\r\n<>]+$/),
     city: z.string().trim().max(120),
     postalCode: z.string().trim().max(5),
     address: z.string().trim().max(250),
@@ -32,15 +23,12 @@ const submissionSchema = z.object({
   pickupLocation: z.string().max(120).optional(),
 }).strict();
 
-export function ordersEnabled(config: OrderEmailConfig): boolean {
-  return config.ORDERS_ENABLED === "true" && !!config.RESEND_API_KEY?.trim() && !!config.ORDER_EMAIL_FROM?.trim();
-}
-
 function json(body: unknown, status = 200) {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-// Best-effort per-worker protection. Provider limits still apply across workers.
+// Best-effort per-process protection. Hosting proxy must overwrite client IP headers;
+// configure edge rate limits as well for deployments with multiple processes.
 const attempts = new Map<string, { count: number; until: number }>();
 function allowAttempt(ip: string): boolean {
   const now = Date.now();
@@ -75,30 +63,7 @@ async function readBody(request: Request): Promise<string> {
   return new TextDecoder().decode(body);
 }
 
-function emailText(payload: CartPayload, orderId: string): string {
-  const quote = calculateCartQuote(payload.items, payload.delivery);
-  const lines = payload.items.flatMap(item => {
-    const product = products.find(product => product.id === item.productId)!;
-    return [
-      `${product.name} × ${item.quantity} — ${formatPrice(product.price * item.quantity)}`,
-      ...(item.productId === "auto" && item.hooks ? [`Dodatni MAGic KLICK Hooks, 1 par — ${formatPrice(autoHooksPromoPrice)}`] : []),
-    ];
-  });
-  const customer = payload.customer;
-  return [
-    "NOVA MAGic KLICK PORUDŽBINA", orderId, "", "PROIZVODI", ...lines, "",
-    `Proizvodi ukupno: ${formatPrice(quote.subtotal)}`,
-    `Poštarina: ${quote.delivery === 0 ? "Besplatno" : formatPrice(quote.delivery)}`,
-    `UKUPNO: ${formatPrice(quote.total)}`, "", "KUPAC",
-    `Ime i prezime: ${customer.name}`, `Telefon: ${customer.phone}`,
-    `Email: ${customer.email || "Nije naveden"}`, "", "ISPORUKA",
-    payload.delivery === "post-office" ? "Post Express — preuzimanje u pošti" : "Post Express — na adresu",
-    ...(payload.delivery === "courier" ? [`Mesto: ${customer.city}`, `Ulica i broj: ${customer.address}`] : []),
-    `Poštanski broj: ${customer.postalCode}`, "", "NAPOMENA", customer.note || "Nema napomene.",
-  ].join("\n");
-}
-
-export async function handleOrderRequest(request: Request, config: OrderEmailConfig, send: typeof fetch = fetch): Promise<Response> {
+export async function handleOrderRequest(request: Request, service: OrderSubmissionService | null): Promise<Response> {
   const origin = request.headers.get("Origin");
   if ((origin && origin !== new URL(request.url).origin) || request.headers.get("Sec-Fetch-Site") === "cross-site") {
     return json({ error: "Zahtev nije dozvoljen." }, 403);
@@ -106,8 +71,9 @@ export async function handleOrderRequest(request: Request, config: OrderEmailCon
   if (!request.headers.get("Content-Type")?.toLowerCase().startsWith("application/json")) {
     return json({ error: "Neispravan format zahteva." }, 415);
   }
-  if (!ordersEnabled(config)) return json({ error: "Poručivanje trenutno nije dostupno. Pokušaj kasnije ili nas kontaktiraj." }, 503);
-  if (!allowAttempt(request.headers.get("CF-Connecting-IP") || "local")) return json({ error: "Previše pokušaja. Pokušaj ponovo kasnije." }, 429);
+  if (!service) return json({ error: "Poručivanje trenutno nije dostupno. Pokušaj kasnije ili nas kontaktiraj." }, 503);
+  const ip = request.headers.get("CF-Connecting-IP") || request.headers.get("X-Real-IP") || request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() || "local";
+  if (!allowAttempt(ip)) return json({ error: "Previše pokušaja. Pokušaj ponovo kasnije." }, 429);
 
   let raw: unknown;
   try { raw = JSON.parse(await readBody(request)); }
@@ -121,31 +87,15 @@ export async function handleOrderRequest(request: Request, config: OrderEmailCon
   if (Object.keys(validateCustomer(data.customer, data.delivery)).length) return json({ error: "Proveri podatke za isporuku." }, 400);
 
   const payload: CartPayload = { ...data, pickupLocation: "" };
-  const orderId = `MK-${data.requestId.toUpperCase()}`;
-  const quote = calculateCartQuote(payload.items, payload.delivery);
   try {
-    const result = await send("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.RESEND_API_KEY!.trim()}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": `order/${data.requestId}`,
-      },
-      body: JSON.stringify({
-        from: config.ORDER_EMAIL_FROM!.trim(),
-        to: [recipient],
-        ...(data.customer.email ? { reply_to: data.customer.email } : {}),
-        subject: `Nova porudžbina ${orderId} — MAGic KLICK`,
-        text: emailText(payload, orderId),
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!result.ok) return json({ error: "Porudžbina nije potvrđena. Pokušaj ponovo ili nas kontaktiraj." }, 502);
-    const accepted: unknown = await result.json();
-    if (!accepted || typeof accepted !== "object" || !("id" in accepted) || typeof accepted.id !== "string" || !accepted.id) throw new Error("missing_email_id");
-    const receipt: OrderReceipt = { id: orderId, createdAt: new Date().toISOString(), mode: "live", total: quote.total };
+    const receipt = await service.submit(payload, data.requestId);
+    if (!receipt) return json({ error: "Porudžbina nije potvrđena jer interni email nije poslat. Pokušaj ponovo ili nas kontaktiraj." }, 502);
     return json(receipt);
-  } catch {
+  } catch (error) {
+    if (error instanceof OrderRecordError) return json({ error: "Porudžbina nije poslata jer evidencija nije sačuvana. Pokušaj ponovo ili nas kontaktiraj." }, 503);
+    if (error instanceof OrderConflictError) return json({ error: "Podaci ovog pokušaja su izmenjeni. Ponovo otvori pregled porudžbine." }, 409);
+    if (error instanceof OrderCapacityError) return json({ error: "Poručivanje je trenutno zauzeto. Pokušaj kasnije." }, 503);
+    console.error("[order-email]", { orderId: `MK-${data.requestId.toUpperCase()}`, code: "order_submission_failed" });
     return json({ error: "Potvrda nije uspela. Pokušaj ponovo ili nas kontaktiraj." }, 502);
   }
 }

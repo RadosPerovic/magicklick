@@ -1,0 +1,11 @@
+{
+  "enabled": false,
+  "host": "host133.dwhost.net",
+  "port": 465,
+  "encryption": "implicit-tls",
+  "username": "info@magic-klick.rs",
+  "password": "",
+  "fromEmail": "info@magic-klick.rs",
+  "fromName": "Magic Klick",
+  "ordersEmail": "orders@magic-klick.rs"
+}
