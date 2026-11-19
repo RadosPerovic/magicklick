@@ -19,6 +19,15 @@ export default defineConfig(async ({ command }) => {
       define: { __MAGIC_KLICK_NODE__: "true" },
       plugins: [vinext()],
       ssr: { external: ["nodemailer"] },
+      environments: {
+        client: {
+          build: {
+            // Link dynamically imports the navigation namespace in production.
+            // Keep its exports intact when Rolldown merges shared entry chunks.
+            rolldownOptions: { preserveEntrySignatures: "strict" as const },
+          },
+        },
+      },
     };
   }
   // Use Miniflare's local Request.cf placeholder unless fetching is requested.
