@@ -14,6 +14,7 @@
     "start:node": "node scripts/run-node.mjs start",
     "check:email": "node scripts/check-order-email.mjs",
     "check:orders": "node scripts/check-order-record.mjs",
+    "check:seo": "node scripts/check-seo.mjs",
     "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"

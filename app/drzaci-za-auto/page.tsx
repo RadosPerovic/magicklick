@@ -1,4 +1,8 @@
 import { ProductPage } from "@/components/magic/product-page";
 import { products } from "@/lib/catalog";
-export const metadata={title:"Držači za tablice bez rama — MAGic KLICK Auto",description:"Komplet držača za prednju i zadnju tablicu. Pogledaj fotografije, uputstva za montažu i poruči svoj MAGic KLICK."};
-export default function Page(){return <ProductPage key={products[0].id} product={products[0]}/>}
+import { StructuredData } from "@/components/magic/structured-data";
+import { productMetadata, productStructuredData } from "@/lib/seo";
+
+const product = products[0];
+export const metadata = productMetadata(product);
+export default function Page(){return <><ProductPage key={product.id} product={product}/><StructuredData id="product-schema" data={productStructuredData(product)}/></>}

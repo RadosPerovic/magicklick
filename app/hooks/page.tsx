@@ -1,4 +1,8 @@
 import { ProductPage } from "@/components/magic/product-page";
 import { products } from "@/lib/catalog";
-export const metadata={title:"Hooks kukice za sedišta — MAGic KLICK",description:"Praktične kukice za kese i stvari na naslonu za glavu. Pogledaj MAGic KLICK Hooks i dodaj ih u korpu."};
-export default function Page(){return <ProductPage key={products[2].id} product={products[2]}/>}
+import { StructuredData } from "@/components/magic/structured-data";
+import { productMetadata, productStructuredData } from "@/lib/seo";
+
+const product = products[2];
+export const metadata = productMetadata(product);
+export default function Page(){return <><ProductPage key={product.id} product={product}/><StructuredData id="product-schema" data={productStructuredData(product)}/></>}

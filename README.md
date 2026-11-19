@@ -29,6 +29,8 @@ node scripts/run-framework.mjs build
 
 ## Podešavanje sadržaja
 
+Tehnička SEO podešavanja, ciljne fraze i provera su opisani u [SEO.md](SEO.md). SEO podaci koriste produkcioni domen `https://magic-klick.rs`; izgled i vidljiv sadržaj stranica ostaju isti.
+
 - `lib/catalog.ts`: proizvodi, cene, iznos dostave, prag besplatne dostave i fotografije.
 - `lib/orders.ts`: obračun, validacija i transport narudžbine. Cena proizvoda množi se količinom bez količinskog popusta; dodatni hooks par se obračunava jednom uz izabrani proizvod (300 RSD uz auto držač).
 - `lib/order-record.server.ts`: obavezna mesečna TXT evidencija van aplikacije, upis pre emailova i redni brojevi po mesecu.
