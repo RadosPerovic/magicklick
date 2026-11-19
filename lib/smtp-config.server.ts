@@ -17,20 +17,26 @@ export const smtpConfigSchema = z.object({
 
 export type SmtpConfig = z.infer<typeof smtpConfigSchema>;
 
-export function loadServerEmailSettings(): SmtpConfig | null {
+export function loadServerEmailSettings(options: { appRoot?: string } = {}): SmtpConfig | null {
   const configuredPath = process.env.MAGIC_KLICK_EMAIL_CONFIG;
-  if (!configuredPath) return null;
+  const appRoot = realpathSync(options.appRoot ?? process.cwd());
+  const configPath = configuredPath || path.join(appRoot, "private", "order-email.json");
   // Resolve symlinks as well: a secret must never be served as a static asset.
-  if (!path.isAbsolute(configuredPath)) throw new Error("email_config_path_must_be_absolute");
-  const filename = realpathSync(configuredPath);
+  if (!path.isAbsolute(configPath)) throw new Error("email_config_path_must_be_absolute");
+  let filename: string;
+  try { filename = realpathSync(configPath); }
+  catch (error) {
+    // A checkout without project settings can still be used as a preview.
+    if (!configuredPath && (error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
   if (/(^|[\\/])(public|public_html|www|htdocs)([\\/]|$)/i.test(filename)) {
     throw new Error("email_config_must_be_outside_public_files");
   }
-  const appRoot = realpathSync(process.cwd());
   const relative = path.relative(appRoot, filename);
   const withinApp = relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
-  if (withinApp && (process.env.NODE_ENV === "production" || /^(public|dist|out|\.next)([\\/]|$)/i.test(relative))) {
-    throw new Error("email_config_must_be_outside_application");
+  if (withinApp && /^(public|dist|out|\.next|\.vinext)([\\/]|$)/i.test(relative)) {
+    throw new Error("email_config_must_be_outside_public_files");
   }
   const smtp = smtpConfigSchema.parse(JSON.parse(readFileSync(filename, "utf8").replace(/^\uFEFF/, "")));
   if (!smtp.enabled) return null;

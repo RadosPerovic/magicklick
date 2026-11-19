@@ -16,7 +16,7 @@ Ako želiš eksplicitno relativno podešavanje, opciona serverska promenljiva mo
 MAGIC_KLICK_ORDERS_DIRECTORY=../orders
 ```
 
-Apsolutna putanja poput `/home/CPANEL_USER/orders` i dalje je podržana ako ti zatreba. U oba slučaja odredište mora ostati van aplikacije i javnog document root-a. `./orders` označava folder unutar aplikacije i zato se odbija. Aplikaciju lokalno pokreći iz njenog osnovnog direktorijuma; u cPanel-u to je podešeni Application root. Relativna putanja je serverska putanja na disku, a ne ruta sajta. Roditeljski direktorijum mora dozvoljavati pisanje Node procesu. Putanje kroz simboličke linkove se proveravaju; lokacije u `public_html`, `public`, `www`, `htdocs`, `dist` i `.next` se odbijaju. Na Linuxu se novi folder kreira sa dozvolama `700`, a fajlovi sa `600`. Ne postavljaj statičku rutu za ovaj folder. Uključi ga u serverski backup; ne ide u Git ili build.
+Apsolutna putanja poput `/home/CPANEL_USER/orders` i dalje je podržana ako ti zatreba. U oba slučaja odredište mora ostati van aplikacije i javnog document root-a. `./orders` označava folder unutar aplikacije i zato se odbija. Aplikaciju lokalno pokreći iz njenog osnovnog direktorijuma; u cPanel-u to je podešeni Application root. Generisani standalone `server.js` automatski koristi svoj direktorijum kao radni direktorijum. Na hostingu postavi sadržaj `dist/standalone` kao aplikacioni direktorijum, npr. `/home/CPANEL_USER/magic-klick`; evidencija će tada biti `/home/CPANEL_USER/orders`. Nemoj standalone izdanje pokretati za stvarne porudžbine unutar projektnog `dist` foldera: evidencija ne sme biti u build folderu. Relativna putanja je serverska putanja na disku, a ne ruta sajta. Roditeljski direktorijum mora dozvoljavati pisanje Node procesu. Putanje kroz simboličke linkove se proveravaju; lokacije u `public_html`, `public`, `www`, `htdocs`, `dist` i `.next` se odbijaju. Na Linuxu se novi folder kreira sa dozvolama `700`, a fajlovi sa `600`. Ne postavljaj statičku rutu za ovaj folder. Uključi ga u serverski backup; ne ide u Git ili build.
 
 Svaka porudžbina je jedan UTF-8 red, sa atributima odvojenim zarezima. Između dve porudžbine dodaje se jedan prazan red radi čitljivosti. Prazni redovi ne utiču na mesečnu numeraciju. Primer:
 
@@ -42,7 +42,11 @@ Posle nasilnog gašenja procesa može ostati `.orders.lock`. Aplikacija ga namer
 
 ## Privatna konfiguracija
 
-Verzionisan primer bez tajni: `config/order-email.example.json`. Po zahtevu vlasnika projekta, i `private/order-email.json` je uključen u Git verzionisanje, sa `enabled: true` i početno praznom lozinkom. Lozinka koja se naknadno unese u ovaj fajl može ući u Git istoriju. Menjaju se sledeća polja:
+Podrazumevana konfiguracija je **`private/order-email.json` u okviru projekta**, nalik `appsettings.json`. Automatski se čita u lokalnom i produkcionom Node režimu; `MAGIC_KLICK_EMAIL_CONFIG` nije obavezan. Fajl se čita samo na serveru i ne uvozi se u JavaScript za pregledač.
+
+`npm run build` automatski kopira ovu konfiguraciju u **`dist/standalone/private/order-email.json`**. Prenesi ceo sadržaj `dist/standalone` na Node hosting, uključujući `private` folder. Podešavanja u kopiranom JSON-u koristi produkcija. Posle promene projektnog fajla ponovo napravi i postavi build; direktnu izmenu serverske kopije aktivira restart aplikacije.
+
+Verzionisan primer bez tajni: `config/order-email.example.json`. Po zahtevu vlasnika projekta, i `private/order-email.json` je uključen u Git verzionisanje. Lozinka koja se unese u taj fajl može ući u Git istoriju. Ni projekat ni standalone paket ne postavljaj kao statički javni direktorijum; javni resursi su isključivo u `public` i `dist/client`. Menjaju se sledeća polja:
 
 | Polje | Početna vrednost / značenje |
 | --- | --- |
@@ -65,22 +69,19 @@ DreamWeb [uputstvo za email klijent](https://helpdesk.dreamweb.rs/sr/baza-znanja
 Node.js 22.13+ i instalirane zavisnosti:
 
 ```powershell
-New-Item -ItemType Directory -Force private
-Copy-Item config/order-email.example.json private/order-email.json
-$env:MAGIC_KLICK_EMAIL_CONFIG = 'C:\Projects\MagicKlickTestSajt\magic-klick\private\order-email.json'
-npm run dev:node
+npm run dev
 ```
 
-Ako direktorijum `private` ne postoji, prvo ga napravi. Ne prepisuj već popunjenu kopiju. Konfiguracija sa `enabled: false` ne šalje emailove. Lozinka sa praznom vrednošću ne dozvoljava uključivanje slanja.
+Popuni postojeći `private/order-email.json`. Ako ne postoji, napravi ga kopiranjem `config/order-email.example.json`; ne prepisuj već popunjenu kopiju. Konfiguracija sa `enabled: false` ne šalje emailove. Lozinka sa praznom vrednošću ne dozvoljava uključivanje slanja. Ako je ostala ranije postavljena promenljiva `MAGIC_KLICK_EMAIL_CONFIG`, ukloni je da bi se koristio projektni fajl. Promenljiva i dalje može opciono pokazivati na drugi privatni JSON fajl preko apsolutne putanje.
 
 ## Produkcija na Node.js hostingu
 
-1. Potreban je hosting paket sa podrškom za Node.js 22.13 ili noviji i izlaznom SMTP konekcijom ka DreamWeb serveru. Proveri dostupnost opcije **Setup Node.js App** i odgovarajuće verzije u konkretnom cPanel nalogu. DreamWeb podržava Node.js samo na određenim paketima; javno uputstvo ne potvrđuje verzije dostupne na tvom nalogu. Postojeći Cloudflare/Sites build (`npm run build` / `npm run start`) ne koristi ovaj SMTP modul i prikazuje poručivanje kao isključeno. Statički hosting sam ne može slati ove poruke.
-2. Kopiraj primer na server, **van Git repozitorijuma, aplikacionog direktorijuma i javnog document root-a**, npr. `/home/CPANEL_USER/magic-klick-private/order-email.json`. Nemoj ga stavljati u `public_html`, `public`, `www`, `htdocs`, `dist` ili `.next`.
-3. Ručno popuni lozinku, potvrdi host/port/enkripciju u cPanel-u, proveri pošiljaoca i prijemno sanduče. U JSON-u koristi validne JSON escape sekvence ako lozinka sadrži navodnike ili obrnutu kosu crtu. Ograniči pristup fajlu na vlasnika procesa (`chmod 600`, privatni direktorijum `chmod 700`). Projektni fajl `private/order-email.json` izuzet je iz Git ignorisanja po zahtevu vlasnika; ostali privatni fajlovi ostaju ignorisani.
-4. U serverskim environment variables postavi `MAGIC_KLICK_EMAIL_CONFIG=/home/CPANEL_USER/magic-klick-private/order-email.json`. Putanja SMTP konfiguracije ostaje apsolutna; to nije sadržaj konfiguracije. Za evidenciju ne moraš postavljati `MAGIC_KLICK_ORDERS_DIRECTORY`: koristi se `../orders`. Ako je već postavljena stara apsolutna vrednost, ukloni je ili zameni sa `../orders`. Ne koristi `NEXT_PUBLIC_*` ili `VITE_*` promenljive za tajne.
-5. Instaliraj zavisnosti i napravi Node build (`npm ci`, `npm run build:node`), lokalno ili u podržanom Node okruženju. **Na DreamWeb deljenom hostingu aplikaciju pokreći i restartuj kroz cPanel → Setup Node.js App**, prema [njihovom uputstvu](https://helpdesk.dreamweb.rs/sr/baza-znanja/article/pokretanje-node-js-aplikacije); ono izričito ne podržava pokretanje preko `start` skripte iz `package.json`. Postavi Production režim i aplikacioni direktorijum van `public_html`. Build generiše `dist/standalone/server.js` i potrebne runtime zavisnosti, ali kompatibilnost tog ESM startup fajla sa konkretnom cPanel/Passenger instalacijom mora se proveriti pri postavljanju; može biti potreban prilagođen startup adapter. `npm run start:node` ostaje komanda za standardno samostalno Node okruženje, a nije potvrđen DreamWeb postupak. Proxy mora prepisivati IP zaglavlja, uz sopstveno ograničenje broja zahteva.
-6. Kada si spreman za stvarno slanje, postavi `enabled: true` i restartuj Node aplikaciju. Konfiguracija se čita sa diska na prvom zahtevu; uspešno učitani servis se koristi do restarta. U produkciji se odbija konfiguracioni fajl unutar aplikacije, uključujući putanje kroz simboličke linkove. Posle izmene konfiguracije uvek restartuj proces.
+1. Potreban je hosting paket sa podrškom za Node.js 22.13 ili noviji, trajnim upisivim diskom i izlaznom SMTP konekcijom ka DreamWeb serveru. Proveri dostupnost opcije **Setup Node.js App** i odgovarajuće verzije u konkretnom cPanel nalogu. DreamWeb podržava Node.js samo na određenim paketima; javno uputstvo ne potvrđuje verzije dostupne na tvom nalogu. Vercel nije podržan za ovu lokalnu TXT evidenciju. Statički hosting sam ne može slati ove poruke.
+2. U projektu popuni **`private/order-email.json`**: potvrdi host/port/enkripciju u cPanel-u, lozinku, pošiljaoca i prijemno sanduče. U JSON-u koristi validne JSON escape sekvence ako lozinka sadrži navodnike ili obrnutu kosu crtu. Kada si spreman za stvarno slanje, postavi `enabled: true`.
+3. Instaliraj zavisnosti i napravi produkcioni Node paket: **`npm ci`**, zatim **`npm run build`**. Komande `dev`, `build` i `start` podrazumevano koriste Node profil; ranije `:node` komande ostaju podržane. Cloudflare/Sites pregled ostaje izdvojen kao `dev:preview`, `build:preview` i `start:preview`, sa poručivanjem isključenim.
+4. Postavi **ceo sadržaj `dist/standalone`** u privatni aplikacioni direktorijum van `public_html`, npr. `/home/CPANEL_USER/magic-klick`. Paket već sadrži `private/order-email.json`, `server.js`, resurse i runtime zavisnosti. Ograniči pristup konfiguraciji na vlasnika procesa (`chmod 600`, privatni direktorijum `chmod 700`). Ne izlaži `private` folder kroz web-server.
+5. **Na DreamWeb deljenom hostingu aplikaciju pokreći i restartuj kroz cPanel → Setup Node.js App**, prema [njihovom uputstvu](https://helpdesk.dreamweb.rs/sr/baza-znanja/article/pokretanje-node-js-aplikacije); ono izričito ne podržava pokretanje preko `start` skripte iz `package.json`. Postavi Production režim, aplikacioni direktorijum iz prethodnog koraka i startup fajl `server.js`. Kompatibilnost tog ESM startup fajla sa konkretnom cPanel/Passenger instalacijom mora se proveriti pri postavljanju; može biti potreban prilagođen startup adapter. Za standardan samostalan Node hosting pokreni `node server.js` iz postavljenog paketa. Proxy mora prepisivati IP zaglavlja, uz sopstveno ograničenje broja zahteva.
+6. **Nisu potrebne putanje kroz environment variables.** Podrazumevano se koristi `private/order-email.json` i evidencija `../orders`. Ukloni stare promenljive `MAGIC_KLICK_EMAIL_CONFIG` i `MAGIC_KLICK_ORDERS_DIRECTORY` ako želiš ova podrazumevana podešavanja. Obe promenljive i dalje ostaju opcione zamene. Konfiguracija u javnim folderima se odbija, uključujući putanje kroz simboličke linkove. Fajl se čita na prvom zahtevu, a uspešno učitani servis se koristi do restarta. Posle izmene serverskog JSON-a restartuj proces.
 7. Prvo testiraj sopstvenom adresom kupca i proveri obe poruke. Automatske provere opisane ispod ne otvaraju SMTP veze i ne šalju stvarne poruke.
 
 Za `orders` nije potrebna administratorska/root dozvola: Node proces mora imati pravo kreiranja fajlova i pisanja u tom folderu, odnosno u roditeljskom folderu ako `orders` još ne postoji. Ako su Node proces i folder pod istim cPanel korisnikom, dozvole `700` za folder i `600` za fajlove daju vlasniku potrebna prava. Ako se javi `EACCES` ili `EPERM`, proveri vlasništvo i pristup sa hosting podrškom. Konkretni nalog, Passenger startup, Linux fajl-sistem i SMTP prijem nisu provereni lokalnim Windows testovima; konačna potvrda zahteva probu na hostingu.
@@ -101,8 +102,11 @@ npm run check:orders
 node scripts/check-cart.mjs
 node node_modules/typescript/bin/tsc --noEmit --incremental false
 npm run build:node
+npm run check:deployment
 ```
 
-Email provera koristi lažni transport i Nodemailer `streamTransport` koji samo generiše MIME u memoriji. Obuhvata HTML escaping, tekstualnu alternativu, oba primaoca, zaglavlja, TLS opcije, sve kombinacije delimičnog neuspeha, ponovljene i istovremene zahteve, validaciju, privatnu konfiguraciju i cene za oba načina dostave. Ne proverava stvarnu DreamWeb konekciju/prijem bez lozinke.
+Email provera koristi lažni transport i Nodemailer `streamTransport` koji samo generiše MIME u memoriji. Obuhvata HTML escaping, tekstualnu alternativu, oba primaoca, zaglavlja, TLS opcije, sve kombinacije delimičnog neuspeha, ponovljene i istovremene zahteve, validaciju, automatsko učitavanje projektnog JSON-a u produkciji, kopiranje konfiguracije uz standalone server i cene za oba načina dostave. Ne proverava stvarnu DreamWeb konekciju/prijem bez slanja.
 
 Provera `check:orders` koristi privremene test foldere i izmišljene kupce. Obuhvata stvaran upis/čitanje i `fsync`, mesečnu numeraciju, prelazak meseca, letnje vreme, sprečavanje dodatnog reda pri ponovnom pokušaju i posle restarta, paralelan upis iz tri Node procesa, neispravnu putanju, simboličke linkove, zauzetu evidenciju i oporavak nepotpunog upisa. Proverava da neuspešan upis sprečava oba emaila. Ne koristi stvarnu SMTP konfiguraciju.
+
+`check:deployment` se pokreće posle Node builda. Proverava da je kopirani JSON isti kao projektni fajl, da lozinka nije u javnom JavaScript-u i da produkcioni standalone server učitava konfiguraciju bez promenljive za putanju čak i kada se pokrene iz drugog direktorijuma. GET provera ne otvara SMTP vezu. Konfiguracioni URL-ovi moraju vratiti 404. Ne šalje porudžbine niti emailove.

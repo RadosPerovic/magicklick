@@ -7,6 +7,7 @@ import vm from "node:vm";
 import ts from "typescript";
 import * as zod from "zod";
 import nodemailer from "nodemailer";
+import { packageNodeConfig } from "./package-node-config.mjs";
 
 const logs = [];
 let transportOptions;
@@ -249,26 +250,67 @@ transportError = Object.assign(new Error(config.password), { code: "EAUTH" });
 await assert.rejects(smtpSender(config)(customer), error => error.code === "EAUTH");
 assert.equal(closeCount, 3);
 
-// Config is read from a private file at runtime, never imported into a bundle.
+// Project settings work in production without an environment-variable path.
+// All fixtures use fake credentials, never the real project settings.
 const temp = mkdtempSync(path.join(os.tmpdir(), "magic-klick-email-test-"));
+const appRoot = path.join(temp, "app");
+fs.mkdirSync(path.join(appRoot, "private"), { recursive: true });
+const projectConfig = path.join(appRoot, "private", "order-email.json");
+const loadTestSettings = () => loadServerEmailSettings({ appRoot });
 const oldPath = process.env.MAGIC_KLICK_EMAIL_CONFIG;
 const oldMode = process.env.NODE_ENV;
 try {
   delete process.env.MAGIC_KLICK_EMAIL_CONFIG;
-  assert.equal(loadServerEmailSettings(), null);
+  assert.equal(loadTestSettings(), null);
+  process.env.NODE_ENV = "production";
+  writeFileSync(projectConfig, `\uFEFF${JSON.stringify(config)}`);
+  assert.equal(loadTestSettings().password, config.password);
+  writeFileSync(projectConfig, JSON.stringify({ ...config, enabled: false, password: "" }));
+  assert.equal(loadTestSettings(), null);
+  writeFileSync(projectConfig, JSON.stringify({ ...config, password: "" }));
+  assert.throws(loadTestSettings, /smtp_password_required/);
+  writeFileSync(projectConfig, JSON.stringify(config));
+
+  // Only the server-side deployment receives the JSON file. Its entry point
+  // fixes cwd so private settings and ../orders resolve consistently.
+  const standalone = path.join(appRoot, "dist", "standalone");
+  fs.mkdirSync(standalone, { recursive: true });
+  const serverPath = path.join(standalone, "server.js");
+  writeFileSync(serverPath, '#!/usr/bin/env node\nimport "node:path";\n');
+  packageNodeConfig(appRoot);
+  assert.equal(readFileSync(path.join(standalone, "private", "order-email.json"), "utf8"), readFileSync(projectConfig, "utf8"));
+  const entry = readFileSync(serverPath, "utf8");
+  assert(entry.startsWith("#!/usr/bin/env node\nprocess.chdir(import.meta.dirname);\n"));
+  assert(!fs.existsSync(path.join(standalone, "public", "private", "order-email.json")));
+  packageNodeConfig(appRoot);
+  assert.equal(readFileSync(serverPath, "utf8"), entry); // Idempotent packaging.
+  writeFileSync(projectConfig, '{"password":"fake-secret",');
+  assert.throws(() => packageNodeConfig(appRoot), error => error.message === "project_email_config_invalid_json");
+  writeFileSync(projectConfig, JSON.stringify(config));
+
+  // An explicit external configuration remains an optional override.
   const filename = path.join(temp, "order-email.json");
   process.env.MAGIC_KLICK_EMAIL_CONFIG = filename;
   process.env.NODE_ENV = "production";
   writeFileSync(filename, JSON.stringify(config));
-  assert.equal(loadServerEmailSettings().password, config.password);
+  assert.equal(loadTestSettings().password, config.password);
   writeFileSync(filename, JSON.stringify({ ...config, enabled: false, password: "" }));
-  assert.equal(loadServerEmailSettings(), null);
+  assert.equal(loadTestSettings(), null);
   writeFileSync(filename, JSON.stringify({ ...config, password: "" }));
-  assert.throws(loadServerEmailSettings, /smtp_password_required/);
+  assert.throws(loadTestSettings, /smtp_password_required/);
   process.env.MAGIC_KLICK_EMAIL_CONFIG = "private/order-email.json";
-  assert.throws(loadServerEmailSettings, /must_be_absolute/);
-  process.env.MAGIC_KLICK_EMAIL_CONFIG = path.resolve("config/order-email.example.json");
-  assert.throws(loadServerEmailSettings, /outside_application/);
+  assert.throws(loadTestSettings, /must_be_absolute/);
+  process.env.MAGIC_KLICK_EMAIL_CONFIG = projectConfig;
+  assert.equal(loadTestSettings().password, config.password);
+  for (const directory of ["public", "dist", ".next"]) {
+    fs.mkdirSync(path.join(appRoot, directory), { recursive: true });
+    const unsafe = path.join(appRoot, directory, "order-email.json");
+    writeFileSync(unsafe, JSON.stringify(config));
+    process.env.MAGIC_KLICK_EMAIL_CONFIG = unsafe;
+    assert.throws(loadTestSettings, /outside_public_files/);
+  }
+  process.env.MAGIC_KLICK_EMAIL_CONFIG = path.join(temp, "missing.json");
+  assert.throws(loadTestSettings, /ENOENT/);
 } finally {
   if (oldPath === undefined) delete process.env.MAGIC_KLICK_EMAIL_CONFIG; else process.env.MAGIC_KLICK_EMAIL_CONFIG = oldPath;
   if (oldMode === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = oldMode;
@@ -281,4 +323,4 @@ assert.equal((await route.POST(request())).status, 503);
 assert.equal(sent.length, beforeInvalid); // Reading/refreshing cannot trigger email.
 for (let i = 0; i < 10; i++) assert.equal((await handleOrderRequest(request(payload, { "CF-Connecting-IP": "rate-test" }), service)).status, 200);
 assert.equal((await handleOrderRequest(request(payload, { "CF-Connecting-IP": "rate-test" }), service)).status, 429);
-console.log("PASS: two separate Serbian HTML/text messages, MIME, server totals, partial failures, retries/concurrency, validation, private config and strict TLS. No email or external request was sent; no order database was used.");
+console.log("PASS: two separate Serbian HTML/text messages, MIME, totals, failures, retries/concurrency, validation, production project config, standalone packaging and strict TLS. No email or external request was sent; no order database was used.");

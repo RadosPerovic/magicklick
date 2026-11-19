@@ -24,7 +24,7 @@ Provera i produkciona verzija:
 ```powershell
 node node_modules/typescript/bin/tsc --noEmit
 node scripts/check-cart.mjs
-node scripts/run-framework.mjs build
+npm run build
 ```
 
 ## Podešavanje sadržaja
@@ -44,7 +44,7 @@ Tehnička SEO podešavanja, ciljne fraze i provera su opisani u [SEO.md](SEO.md)
 
 U sessionStorage čuvaju se samo proizvodi, količine i izbor dodatnih kukica, kako bi korpa ostala dostupna pri navigaciji i osvežavanju. Podaci kupca ostaju u React stanju stranice korpe do potvrde slanja. Email je obavezno polje. Dostava se u korpi prikazuje tek nakon validnog unosa podataka i obračunava jednom na zbir svih proizvoda. Pregled sadrži fiksni snimak podataka pre potvrde. Pre bilo kog emaila server mora uspešno da upiše porudžbinu u mesečni `.txt` fajl u privatnom `orders` folderu van aplikacije. Uspeh i jedinstveni broj porudžbine prikazuju se kada potom DreamWeb SMTP prihvati interni email. Nema baze porudžbina ni online naplate.
 
-Serverska ruta `/api/orders` šalje dve zasebne HTML/tekstualne poruke: potvrdu kupcu i obaveštenje na adresu iz konfiguracije (početno `orders@magic-klick.rs`). SMTP radi u Node.js profilu: `npm run dev:node`, odnosno `npm run build:node` i `npm run start:node` za produkciju. Postojeći Cloudflare/Sites profil ostaje za pregled, sa poručivanjem isključenim. Bez aktivne konfiguracije kupcu je ponuđeno poručivanje preko Instagrama. Za privatni konfiguracioni fajl, produkciju i ograničenja zaštite od duplikata pogledaj [EMAIL-SETUP.md](EMAIL-SETUP.md). SMTP autentifikacija izvršava se samo na serveru.
+Serverska ruta `/api/orders` šalje dve zasebne HTML/tekstualne poruke: potvrdu kupcu i obaveštenje na adresu iz konfiguracije (početno `orders@magic-klick.rs`). **`private/order-email.json` je podrazumevana serverska konfiguracija u projektu**, automatski učitana i u produkciji. Standardne komande `npm run dev`, `npm run build` i `npm run start` koriste Node profil; `:node` komande su zadržane kao aliasi. Build automatski uključuje konfiguraciju u `dist/standalone/private/order-email.json`. Na Node hosting sa trajnim upisivim diskom prenesi ceo sadržaj `dist/standalone` kao privatni aplikacioni direktorijum van javnog web foldera. Putanja konfiguracije ne mora se postavljati kroz environment variables. Cloudflare/Sites pregled ostaje dostupan preko `dev:preview`, `build:preview` i `start:preview`, sa poručivanjem isključenim. Vercel ne podržava postojeću trajnu TXT evidenciju na lokalnom disku. Bez aktivne konfiguracije kupcu je ponuđeno poručivanje preko Instagrama. Za produkciju i ograničenja zaštite od duplikata pogledaj [EMAIL-SETUP.md](EMAIL-SETUP.md). SMTP autentifikacija izvršava se samo na serveru.
 
 ## Izvori fotografija i sadržaja
 

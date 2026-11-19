@@ -151,7 +151,11 @@ export function createOrderRecorder(options: { directory?: string; appRoot?: str
     while (!lock) {
       try { lock = await open(lockPath, "wx", 0o600); }
       catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        const code = (error as NodeJS.ErrnoException).code;
+        // Windows may return EPERM while another process is closing/deleting
+        // the exclusive lock. Treat this as bounded contention, never proceed
+        // without acquiring the lock. Permission failures still time out.
+        if (code !== "EEXIST" && !(process.platform === "win32" && code === "EPERM")) throw error;
         if (Date.now() >= deadline) throw new Error("orders_lock_timeout");
         await new Promise(resolve => setTimeout(resolve, 25));
       }
