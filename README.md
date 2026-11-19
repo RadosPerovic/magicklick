@@ -27,6 +27,14 @@ node scripts/check-cart.mjs
 npm run build
 ```
 
+## Ceo produkcioni paket za DreamWeb
+
+Iz osnovnog direktorijuma projekta pokreni `npm run build`. Komanda pravi ceo `dist`, a samostalni paket za deploy nalazi se u `dist/standalone`.
+
+Prenesi **sav sadržaj `dist/standalone`**, uz očuvanje podfoldera, direktno u privatni cPanel Application root. Paket uključuje `app.cjs`, `server.js`, `package.json`, `dist`, `node_modules`, `public` i `private`. Za Application startup file izaberi **`app.cjs`**. Na hostingu nije potreban ponovni build niti npm instalacija kada je preneti runtime kompatibilan sa serverom.
+
+`dist/client` i `dist/server` su delovi builda; za ceo deploy koristi se `dist/standalone`. `npm run build:node` je alias iste build komande. Build kopira projektni SMTP JSON: ako si konfiguraciju menjao samo na serveru, sačuvaj tu kopiju pre zamene. Folder evidencije porudžbina ostaje van aplikacije i ne zamenjuje se pri deploy-u.
+
 ## Podešavanje sadržaja
 
 Tehnička SEO podešavanja, ciljne fraze i provera su opisani u [SEO.md](SEO.md). SEO podaci koriste produkcioni domen `https://magic-klick.rs`; izgled i vidljiv sadržaj stranica ostaju isti.

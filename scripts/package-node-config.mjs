@@ -20,6 +20,14 @@ export function packageNodeConfig(projectRoot = process.cwd()) {
   copyFileSync(source, target);
   chmodSync(target, 0o600);
 
+  // Passenger loads CommonJS startup files; import the ESM server dynamically.
+  // Keep this in the build so the complete folder can be deployed unchanged.
+  writeFileSync(path.join(standalone, "app.cjs"), `import('./server.js').catch((error) => {
+  console.error('[magic-klick] Startup failed:', error);
+  process.exit(1);
+});
+`, "utf8");
+
   // The generated server uses paths relative to its deployment root even when
   // launched with `node /absolute/path/server.js` from another directory.
   const initializeRoot = "process.chdir(import.meta.dirname);\n";

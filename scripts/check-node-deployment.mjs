@@ -43,7 +43,7 @@ const { port } = reservation.address();
 await new Promise((resolve, reject) => reservation.close(error => error ? reject(error) : resolve()));
 const environment = { ...process.env, NODE_ENV: "production", HOST: "127.0.0.1", PORT: String(port) };
 delete environment.MAGIC_KLICK_EMAIL_CONFIG;
-const child = spawn(process.execPath, [path.join(standalone, "server.js")], {
+const child = spawn(process.execPath, [path.join(standalone, "app.cjs")], {
   cwd: unrelatedWorkingDirectory, env: environment, stdio: "ignore", windowsHide: true,
 });
 const exited = once(child, "exit");

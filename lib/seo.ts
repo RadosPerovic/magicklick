@@ -71,7 +71,7 @@ export function siteStructuredData() {
         "@id": absoluteUrl("/#organization"),
         name: siteName,
         url: absoluteUrl("/"),
-        email: "magicklick.rs@gmail.com",
+        email: "info@magic-klick.rs",
         telephone: ["+381653613281", "+381648575644"],
         sameAs: ["https://www.instagram.com/magic.klick/", "https://www.tiktok.com/@magic.klick"],
       },

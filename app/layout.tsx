@@ -13,8 +13,8 @@ export const metadata: Metadata = {
   title: homeSeo.title,
   description: homeSeo.description,
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/favicon.svg?v=mk",
+    shortcut: "/favicon.svg?v=mk",
   },
 };
 
