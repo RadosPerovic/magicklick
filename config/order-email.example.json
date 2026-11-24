@@ -4,7 +4,7 @@
   "port": 465,
   "encryption": "implicit-tls",
   "username": "info@magic-klick.rs",
-  "password": "MagPlasticInfo!",
+  "password": "",
   "fromEmail": "info@magic-klick.rs",
   "fromName": "Magic Klick",
   "ordersEmail": "orders@magic-klick.rs"
