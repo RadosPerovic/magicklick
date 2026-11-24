@@ -1,14 +1,24 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, readdir, realpath, unlink } from "node:fs/promises";
 import path from "node:path";
 import { OrderConflictError } from "./order-dispatcher.server";
 import type { OrderEmailSnapshot } from "./order-snapshot";
 
-const columns = ["OrderId", "ImePrezime", "Telefon", "Adresa", "EmailAdresa", "VremePorudzbine", "KontrolniZbir"] as const;
-const previousColumns = columns.filter(column => column !== "Telefon");
+const columns = ["OrderId", "RequestId", "ImePrezime", "Telefon", "Adresa", "EmailAdresa", "VremePorudzbine", "KontrolniZbir"] as const;
+const previousColumns = columns.filter(column => column !== "RequestId");
+const noPhoneColumns = previousColumns.filter(column => column !== "Telefon");
 const legacyColumns = ["OrderId", "Ime", "Prezime", "Adresa", "EmailAdresa", "VremePorudzbine", "KontrolniZbir"] as const;
 type RecordValues = Record<typeof columns[number], string>;
+const shortIdPattern = /^MK-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{7}$/;
+const legacyIdPattern = /^MK-[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}$/;
+const requestIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+
+function generateOrderId(): string {
+  // 32 symbols: five random bits per character, without modulo bias or O/0/I/1.
+  const alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  return `MK-${Array.from(randomBytes(7), byte => alphabet[byte & 31]).join("")}`;
+}
 const noFollow = process.platform === "win32" ? 0 : constants.O_NOFOLLOW;
 const localDate = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Europe/Belgrade", year: "numeric", month: "2-digit", day: "2-digit",
@@ -25,13 +35,14 @@ function orderTime(iso: string): string {
 function recordValues(order: OrderEmailSnapshot): RecordValues {
   const { createdAt: _createdAt, ...content } = order;
   return {
-    OrderId: order.id, ImePrezime: order.customer.name, Telefon: order.customer.phone,
+    OrderId: order.id, RequestId: order.id.slice(3).toLowerCase(),
+    ImePrezime: order.customer.name, Telefon: order.customer.phone,
     Adresa: order.deliveryMethod === "post-office"
       ? `Pošta ${order.customer.postalCode} (preuzimanje u pošti)`
       : `${order.customer.address}, ${order.customer.postalCode} ${order.customer.city}`,
     EmailAdresa: order.customer.email, VremePorudzbine: orderTime(order.createdAt),
-    // Detect reuse of an ID with different customer data, products or amounts,
-    // including after a process restart. The timestamp is restored from the log.
+    // Hash the original snapshot with its UUID-based ID to preserve checksums
+    // in older logs. The public short ID is assigned separately under the lock.
     KontrolniZbir: createHash("sha256").update(JSON.stringify(content)).digest("hex"),
   };
 }
@@ -61,7 +72,9 @@ function parseRows(content: string, month: string): RecordValues[] {
   return content.slice(0, -1).split("\n").filter(line => line.trim() !== "").map((line, index) => {
     const legacy = /^#\d+\t/.test(line);
     const fields = legacy ? line.split("\t") : commaFields(line);
-    const rowColumns = legacy ? legacyColumns : fields.length === previousColumns.length + 1 ? previousColumns : columns;
+    const rowColumns = legacy ? legacyColumns
+      : fields.length === noPhoneColumns.length + 1 ? noPhoneColumns
+      : fields.length === previousColumns.length + 1 ? previousColumns : columns;
     if (fields.length !== rowColumns.length + 1 || fields[0] !== `#${index + 1}`) throw new Error("order_record_invalid_format");
     const parsed: Record<string, string> = {};
     rowColumns.forEach((column, position) => {
@@ -74,7 +87,9 @@ function parseRows(content: string, month: string): RecordValues[] {
     const values = parsed as RecordValues;
     if (legacy) values.ImePrezime = [parsed.Ime, parsed.Prezime].filter(Boolean).join(" ");
     if (!("Telefon" in parsed)) values.Telefon = "";
-    if (!/^MK-[A-F0-9-]{36}$/.test(values.OrderId) || !/^[a-f0-9]{64}$/.test(values.KontrolniZbir)
+    if (!("RequestId" in parsed) && legacyIdPattern.test(values.OrderId)) values.RequestId = values.OrderId.slice(3).toLowerCase();
+    if (!(shortIdPattern.test(values.OrderId) || legacyIdPattern.test(values.OrderId))
+      || !requestIdPattern.test(values.RequestId ?? "") || !/^[a-f0-9]{64}$/.test(values.KontrolniZbir)
       || !Number.isFinite(Date.parse(values.VremePorudzbine)) || values.VremePorudzbine.slice(0, 7) !== month) {
       throw new Error("order_record_invalid_value");
     }
@@ -166,6 +181,7 @@ export function createOrderRecorder(options: { directory?: string; appRoot?: str
       let count = 0;
       let separator = "";
       let existing: RecordValues | undefined;
+      const usedIds = new Set<string>();
       const files = (await readdir(resolved)).filter(name => /^\d{4}-\d{2}\.txt$/.test(name)).sort();
       // Search older months too: retrying the same request at a month boundary
       // must not append another order or change the original timestamp.
@@ -175,16 +191,29 @@ export function createOrderRecorder(options: { directory?: string; appRoot?: str
           count = saved.rows.length;
           separator = count > 0 && !saved.endsWithBlankLine ? "\n" : "";
         }
-        for (const row of saved.rows) if (row.OrderId === order.id) {
-          if (existing) throw new Error("order_record_duplicate_id");
-          existing = row;
+        for (const row of saved.rows) {
+          if (usedIds.has(row.OrderId)) throw new Error("order_record_duplicate_id");
+          usedIds.add(row.OrderId);
+          if (row.RequestId === values.RequestId) {
+            if (existing) throw new Error("order_record_duplicate_request_id");
+            existing = row;
+          }
         }
       }
       if (existing) {
         if (existing.KontrolniZbir !== values.KontrolniZbir) throw new OrderConflictError("request_id_reused");
         await syncDirectory(resolved);
-        return { ...order, createdAt: new Date(existing.VremePorudzbine).toISOString() };
+        return { ...order, id: existing.OrderId, createdAt: new Date(existing.VremePorudzbine).toISOString() };
       }
+      // Allocate only after checking for retries, while all writers share the
+      // same lock. A collision gets another candidate, never another order's ID.
+      let publicId: string | undefined;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const candidate = generateOrderId();
+        if (!usedIds.has(candidate)) { publicId = candidate; break; }
+      }
+      if (!publicId) throw new Error("order_id_generation_exhausted");
+      values.OrderId = publicId;
       const line = `${separator}#${count + 1},${columns.map(column => `${column}=${encode(values[column])}`).join(",")}\n`;
       const filename = path.join(resolved, `${month}.txt`);
       const handle = await open(filename, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | noFollow, 0o600);
@@ -194,7 +223,7 @@ export function createOrderRecorder(options: { directory?: string; appRoot?: str
         await handle.sync(); // SMTP is forbidden until this succeeds.
       } finally { await handle.close(); }
       await syncDirectory(resolved);
-      return order;
+      return { ...order, id: publicId };
     } finally {
       await lock.close();
       await unlink(lockPath);

@@ -14,6 +14,8 @@ export interface OrderEmailSnapshot extends OrderReceipt {
 export function snapshotOrder(payload: CartPayload, requestId: string): OrderEmailSnapshot {
   const quote = calculateCartQuote(payload.items, payload.delivery);
   return {
+    // Internal retry identity; the recorder assigns/restores the public short
+    // ID before the snapshot reaches either email or the checkout receipt.
     id: `MK-${requestId.toUpperCase()}`, mode: "live",
     createdAt: new Date().toISOString(), customer: { ...payload.customer },
     deliveryMethod: payload.delivery as OrderEmailSnapshot["deliveryMethod"],

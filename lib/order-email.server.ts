@@ -95,7 +95,7 @@ export async function handleOrderRequest(request: Request, service: OrderSubmiss
     if (error instanceof OrderRecordError) return json({ error: "Porudžbina nije poslata jer evidencija nije sačuvana. Pokušaj ponovo ili nas kontaktiraj." }, 503);
     if (error instanceof OrderConflictError) return json({ error: "Podaci ovog pokušaja su izmenjeni. Ponovo otvori pregled porudžbine." }, 409);
     if (error instanceof OrderCapacityError) return json({ error: "Poručivanje je trenutno zauzeto. Pokušaj kasnije." }, 503);
-    console.error("[order-email]", { orderId: `MK-${data.requestId.toUpperCase()}`, code: "order_submission_failed" });
+    console.error("[order-email]", { requestId: data.requestId, code: "order_submission_failed" });
     return json({ error: "Potvrda nije uspela. Pokušaj ponovo ili nas kontaktiraj." }, 502);
   }
 }

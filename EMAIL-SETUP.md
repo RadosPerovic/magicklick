@@ -21,20 +21,21 @@ Apsolutna putanja poput `/home/CPANEL_USER/orders` i dalje je podržana ako ti z
 Svaka porudžbina je jedan UTF-8 red, sa atributima odvojenim zarezima. Između dve porudžbine dodaje se jedan prazan red radi čitljivosti. Prazni redovi ne utiču na mesečnu numeraciju. Primer:
 
 ```text
-#1,OrderId="MK-15E4A11B-ADAA-4FA1-8CE7-B070F66C53B1",ImePrezime="Marko Petrović",Telefon="0641234567",Adresa="Primer ulica 12, 11000 Beograd",EmailAdresa="marko@example.com",VremePorudzbine="2026-11-19T20:15:12.123+01:00",KontrolniZbir="…"
+#1,OrderId="MK-7K9PX2Q",RequestId="15e4a11b-adaa-4fa1-8ce7-b070f66c53b1",ImePrezime="Marko Petrović",Telefon="0641234567",Adresa="Primer ulica 12, 11000 Beograd",EmailAdresa="marko@example.com",VremePorudzbine="2026-11-19T20:15:12.123+01:00",KontrolniZbir="…"
 
-#2,OrderId="MK-42FE7B42-48F0-4D47-A8D2-755B8B3A068D",ImePrezime="Ana Petrović",Telefon="0651234567",Adresa="Druga ulica 3, 21000 Novi Sad",EmailAdresa="ana@example.com",VremePorudzbine="2026-11-19T20:20:00.000+01:00",KontrolniZbir="…"
+#2,OrderId="MK-8R4NC6W",RequestId="42fe7b42-48f0-4d47-a8d2-755b8b3a068d",ImePrezime="Ana Petrović",Telefon="0651234567",Adresa="Druga ulica 3, 21000 Novi Sad",EmailAdresa="ana@example.com",VremePorudzbine="2026-11-19T20:20:00.000+01:00",KontrolniZbir="…"
 ```
 
-- `OrderId` koristi postojeći oblik **`MK-<UUID>`**, npr. iz primera. UUID se generiše za pokušaj porudžbine; isti ID se koristi u evidenciji, potvrdi na sajtu i oba emaila. Ne zahteva centralni brojač i ne otkriva podatke kupca.
+- `OrderId` za nove porudžbine ima **10 karaktera**, npr. **`MK-7K9PX2Q`**: prefiks `MK-` i sedam nasumičnih slova/brojeva, bez `O`, `0`, `I` i `1`. Generiše se kriptografski slučajnim bajtovima na serveru. Pod zajedničkim zaključavanjem proveravaju se svi mesečni fajlovi; zauzeta oznaka se zamenjuje novom. Ista kratka oznaka koristi se u evidenciji, potvrdi na sajtu i oba emaila.
+- `RequestId` je interni UUID pokušaja porudžbine. Čuva se u privatnoj evidenciji i omogućava vraćanje iste oznake i vremena pri ponovljenom zahtevu, uključujući restart i prelazak meseca. Kupcu se prikazuje `OrderId`.
 - `#1`, `#2` itd. predstavljaju redni broj u tom mesečnom fajlu. Novi mesec počinje od `#1`. Mesec i vreme određuju se u zoni `Europe/Belgrade`, uključujući letnje računanje vremena.
 - Polje „Ime i prezime“ beleži se zajedno kao `ImePrezime`, sa istim sadržajem kao u validiranom unosu. Ime i prezime se ne razdvajaju.
 - `Telefon` se preuzima iz porudžbine i čuva kao tekst, uključujući početnu nulu, pozivni broj i dozvoljeno formatiranje.
 - Za dostavu na adresu beleže se ulica, broj, poštanski broj i mesto. Za preuzimanje u pošti beleži se pošta sa poštanskim brojem.
 - Vrednosti su pod navodnicima, pa zarez u adresi ili imenu ostaje deo vrednosti. Navodnici i kontrolni znakovi u podacima zapisuju se kao JSON escape sekvence: nalepljeni novi redovi i tabovi ne mogu napraviti lažnu dodatnu porudžbinu. Nova porudžbina uvek počinje u novom zasebnom redu.
-- Dodatna kolona `KontrolniZbir` sadrži SHA-256 otisak podataka porudžbine, bez lozinki. Služi da isti ID sa promenjenim podacima bude odbijen i nakon restarta. Ponovljen zahtev sa istim ID-jem i istim sadržajem ne dobija novi red niti nov redni broj; vraća se prvobitno vreme porudžbine. Proveravaju se i prethodni meseci.
+- Dodatna kolona `KontrolniZbir` sadrži SHA-256 otisak podataka porudžbine, bez lozinki. Služi da isti `RequestId` sa promenjenim podacima bude odbijen i nakon restarta. Otisak koristi interni snimak sa UUID-om, čime ostaje kompatibilan sa prethodnim zapisima. Ponovljen zahtev sa istim UUID-om i istim sadržajem ne dobija novi red niti nov redni broj; vraćaju se prvobitna oznaka i vreme porudžbine. Proveravaju se i prethodni meseci.
 
-Stariji redovi sa tabovima i odvojenim `Ime`/`Prezime`, kao i zapisi sa zarezima bez kolone `Telefon`, ostaju podržani pri čitanju. Novi redovi koriste zareze, zajedničko `ImePrezime` i `Telefon`, uz prazan red između porudžbina i nastavak mesečne numeracije. Prethodni zapisi se ne dopunjuju telefonom koji u njima nije sačuvan.
+Stariji redovi sa tabovima i odvojenim `Ime`/`Prezime`, kao i zapisi sa zarezima sa ili bez kolone `Telefon`, ostaju podržani pri čitanju. Njihove oznake `MK-<UUID>` ostaju nepromenjene, a interni `RequestId` izvodi se iz te oznake. Novi redovi koriste kratki `OrderId`, zaseban `RequestId`, zajedničko `ImePrezime` i `Telefon`, uz prazan red između porudžbina i nastavak mesečne numeracije. Prethodni zapisi se ne prepisuju.
 
 Upisi iz više Node procesa na istom hostingu koriste zajednički ekskluzivni fajl `.orders.lock`, tako da se brojevi i redovi ne preklapaju. Svi procesi moraju koristiti isti privatni folder na istom fajl-sistemu. Ako je evidencija zauzeta duže od 5 sekundi, zahtev ne šalje email i može se ponoviti. Ne menjaj ručno redove ili redne brojeve: neispravan završen red zaustavlja dalje upise. Nepotpun poslednji red od prekinutog upisa oporavlja se pre narednog upisa.
 
@@ -107,6 +108,6 @@ npm run check:deployment
 
 Email provera koristi lažni transport i Nodemailer `streamTransport` koji samo generiše MIME u memoriji. Obuhvata HTML escaping, tekstualnu alternativu, oba primaoca, zaglavlja, TLS opcije, sve kombinacije delimičnog neuspeha, ponovljene i istovremene zahteve, validaciju, automatsko učitavanje projektnog JSON-a u produkciji, kopiranje konfiguracije uz standalone server i cene za oba načina dostave. Ne proverava stvarnu DreamWeb konekciju/prijem bez slanja.
 
-Provera `check:orders` koristi privremene test foldere i izmišljene kupce. Obuhvata stvaran upis/čitanje i `fsync`, mesečnu numeraciju, prelazak meseca, letnje vreme, sprečavanje dodatnog reda pri ponovnom pokušaju i posle restarta, paralelan upis iz tri Node procesa, neispravnu putanju, simboličke linkove, zauzetu evidenciju i oporavak nepotpunog upisa. Proverava da neuspešan upis sprečava oba emaila. Ne koristi stvarnu SMTP konfiguraciju.
+Provera `check:orders` koristi privremene test foldere i izmišljene kupce. Obuhvata kratke oznake, namerno izazvan sudar sa oznakom iz ranijeg meseca, stare GUID zapise, stvaran upis/čitanje i `fsync`, mesečnu numeraciju, prelazak meseca, letnje vreme, sprečavanje dodatnog reda pri ponovnom pokušaju i posle restarta, paralelan upis iz tri Node procesa, neispravnu putanju, simboličke linkove, zauzetu evidenciju i oporavak nepotpunog upisa. Proverava da neuspešan upis sprečava oba emaila. Ne koristi stvarnu SMTP konfiguraciju.
 
 `check:deployment` se pokreće posle Node builda. Proverava da je kopirani JSON isti kao projektni fajl, da lozinka nije u javnom JavaScript-u i da produkcioni standalone server učitava konfiguraciju bez promenljive za putanju čak i kada se pokrene iz drugog direktorijuma. GET provera ne otvara SMTP vezu. Konfiguracioni URL-ovi moraju vratiti 404. Ne šalje porudžbine niti emailove.

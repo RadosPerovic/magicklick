@@ -100,10 +100,13 @@ try {
   }
   const record = createOrderRecorder({ directory, appRoot });
   const initial = order("2026-10-31T23:30:00.123Z"); // November in Belgrade.
-  await record(initial);
+  const initialReceipt = await record(initial);
   const first = (await rows(november))[0];
   assert.equal(first.number, "#1");
-  assert.equal(first.OrderId, initial.id);
+  assert.match(first.OrderId, /^MK-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{7}$/);
+  assert.equal(first.OrderId.length, 10);
+  assert.equal(first.OrderId, initialReceipt.id);
+  assert.equal(first.RequestId, initial.id.slice(3).toLowerCase());
   assert.equal(first.ImePrezime, payload.customer.name);
   assert.equal(first.Telefon, "0641234567");
   assert.equal(first.Ime, undefined);
@@ -136,6 +139,7 @@ try {
   // Retry after a restart and even in a later month: same row and original time.
   const restarted = createOrderRecorder({ directory, appRoot });
   const restored = await restarted({ ...initial, createdAt: "2026-12-02T10:00:00.000Z" });
+  assert.equal(restored.id, initialReceipt.id);
   assert.equal(restored.createdAt, initial.createdAt);
   assert.equal((await rows(november)).length, 2);
   assert.equal((await rows(december)).length, 1);
@@ -150,10 +154,12 @@ try {
   const legacyFile = path.join(legacyDirectory, "2026-11.txt");
   const original = (await rows(legacyFile))[0];
   const oldColumns = ["OrderId", "Ime", "Prezime", "Adresa", "EmailAdresa", "VremePorudzbine", "KontrolniZbir"];
-  const oldValues = { ...original, Ime: "Ana", Prezime: "Marija Petrović" };
+  const oldValues = { ...original, OrderId: legacyOrder.id, Ime: "Ana", Prezime: "Marija Petrović" };
   const legacyLine = `#1\t${oldColumns.map(column => `${column}=${JSON.stringify(oldValues[column])}`).join("\t")}\n`;
   await writeFile(legacyFile, legacyLine);
-  assert.equal((await legacyRecord({ ...legacyOrder, createdAt: "2026-12-02T10:00:00.000Z" })).createdAt, legacyOrder.createdAt);
+  const legacyRestored = await legacyRecord({ ...legacyOrder, createdAt: "2026-12-02T10:00:00.000Z" });
+  assert.equal(legacyRestored.createdAt, legacyOrder.createdAt);
+  assert.equal(legacyRestored.id, legacyOrder.id);
   const previousCommaOrder = order();
   await legacyRecord(previousCommaOrder);
   const mixed = await readFile(legacyFile, "utf8");
@@ -165,13 +171,55 @@ try {
 
   // The previous comma-separated format had no phone column and no blank
   // separator. It can coexist with both the original and current formats.
-  const oldCommaLine = mixed.split("\n").filter(Boolean)[1].replace(/,Telefon="(?:[^"\\]|\\.)*"/, "");
+  const oldCommaLine = mixed.split("\n").filter(Boolean)[1]
+    .replace(/OrderId="[^"]+"/, `OrderId="${previousCommaOrder.id}"`)
+    .replace(/,RequestId="[^"]+"/, "")
+    .replace(/,Telefon="(?:[^"\\]|\\.)*"/, "");
   await writeFile(legacyFile, `${legacyLine}${oldCommaLine}\n`);
   await legacyRecord(previousCommaOrder);
   assert.equal((await rows(legacyFile)).length, 2);
   await legacyRecord(order());
   assert.equal((await rows(legacyFile)).length, 3);
   assert.match(await readFile(legacyFile, "utf8"), /\n\n#3,.*Telefon="0641234567"/);
+
+  // The immediately preceding format had a phone but no internal RequestId.
+  const previousDirectory = path.join(temp, "previous-orders");
+  const previousRecord = createOrderRecorder({ directory: previousDirectory, appRoot });
+  const previousOrder = order();
+  await previousRecord(previousOrder);
+  const previousFile = path.join(previousDirectory, "2026-11.txt");
+  const previousLine = (await readFile(previousFile, "utf8"))
+    .replace(/OrderId="[^"]+"/, `OrderId="${previousOrder.id}"`)
+    .replace(/,RequestId="[^"]+"/, "");
+  await writeFile(previousFile, previousLine);
+  assert.equal((await previousRecord(previousOrder)).id, previousOrder.id);
+  assert.equal(await readFile(previousFile, "utf8"), previousLine);
+  assert.match((await previousRecord(order())).id, /^MK-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{7}$/);
+
+  // Force a collision with an earlier month, then verify retry stability and
+  // bounded failure if the random source repeatedly returns an occupied ID.
+  const collisionDirectory = path.join(temp, "collision-orders");
+  const collisionRecord = createOrderRecorder({ directory: collisionDirectory, appRoot });
+  const nodeCrypto = nodeRequire("node:crypto");
+  const originalRandomBytes = nodeCrypto.randomBytes;
+  try {
+    nodeCrypto.randomBytes = size => Buffer.alloc(size, 0);
+    const occupied = await collisionRecord(order());
+    assert.equal(occupied.id, "MK-2222222");
+    let candidates = 0;
+    nodeCrypto.randomBytes = size => Buffer.alloc(size, candidates++ === 0 ? 0 : 1);
+    const collisionInput = order("2026-12-02T10:00:00.000Z");
+    const unique = await collisionRecord(collisionInput);
+    assert.equal(unique.id, "MK-3333333");
+    assert.equal(candidates, 2);
+    nodeCrypto.randomBytes = () => { throw new Error("Retries must not generate an ID"); };
+    assert.equal((await createOrderRecorder({ directory: collisionDirectory, appRoot })(collisionInput)).id, unique.id);
+    assert.equal((await rows(path.join(collisionDirectory, "2026-12.txt"))).length, 1);
+    nodeCrypto.randomBytes = size => Buffer.alloc(size, 0);
+    await assert.rejects(collisionRecord(order()), /order_id_generation_exhausted/);
+    assert.equal((await rows(path.join(collisionDirectory, "2026-11.txt"))).length, 1);
+    assert(!(await readdir(collisionDirectory)).includes(".orders.lock"));
+  } finally { nodeCrypto.randomBytes = originalRandomBytes; }
 
   // Recover an unconfirmed partial append while preserving complete orders.
   await appendFile(november, '#3\tOrderId="interrupted');
@@ -208,20 +256,23 @@ try {
   const lockedRecord = createOrderRecorder({ directory, appRoot, lockTimeoutMs: 75 });
   const config = { fromName: "Test", fromEmail: "sender@example.com", ordersEmail: "internal@example.com" };
   let sent = 0;
-  const service = createOrderSubmissionService(config, async () => {
+  const service = createOrderSubmissionService(config, async message => {
     // This is the actual monthly file, already completely written and fsynced.
-    assert((await rows(november)).some(row => row.OrderId === expectedId));
+    const saved = (await rows(november)).find(row => row.RequestId === requestId);
+    assert(saved);
+    assert(message.subject.endsWith(saved.OrderId));
+    assert(message.text.includes(saved.OrderId));
     sent++;
   }, snapshot => lockedRecord({ ...snapshot, createdAt: "2026-11-19T10:15:12.123Z" }));
   const requestId = randomUUID();
-  const expectedId = `MK-${requestId.toUpperCase()}`;
   await assert.rejects(service.submit(payload, requestId), /order_record_write_failed/);
   assert.equal(sent, 0);
   await unlink(path.join(directory, ".orders.lock"));
-  assert.equal((await service.submit(payload, requestId)).id, expectedId);
+  const confirmed = await service.submit(payload, requestId);
+  assert.match(confirmed.id, /^MK-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{7}$/);
   assert.equal(sent, 2);
   const count = (await rows(november)).length;
-  await service.submit(payload, requestId);
+  assert.equal((await service.submit(payload, requestId)).id, confirmed.id);
   assert.equal((await rows(november)).length, count);
   assert.equal(sent, 2);
 
@@ -253,7 +304,8 @@ try {
     await assert.rejects(syncService.submit(payload, syncRequestId), /order_record_write_failed/);
     assert.equal(syncSends, 0);
     failSync = false;
-    assert.equal((await syncService.submit(payload, syncRequestId)).id, `MK-${syncRequestId.toUpperCase()}`);
+    const savedBeforeSync = (await rows(path.join(syncDirectory, "2026-11.txt")))[0];
+    assert.equal((await syncService.submit(payload, syncRequestId)).id, savedBeforeSync.OrderId);
     assert.equal(syncSends, 2);
     assert.equal((await rows(path.join(syncDirectory, "2026-11.txt"))).length, 1);
   } finally { promises.open = originalOpen; }
@@ -281,11 +333,13 @@ try {
   assert.equal(new Set(concurrentRows.map(row => row.OrderId)).size, 18);
   concurrentRows.forEach((row, index) => assert.equal(row.number, `#${index + 1}`));
   concurrentRows.forEach(row => assert.equal(row.Telefon, payload.customer.phone));
+  concurrentRows.forEach(row => assert.match(row.OrderId, /^MK-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{7}$/));
+  assert.equal(new Set(concurrentRows.map(row => row.RequestId)).size, 18);
   const concurrentLines = (await readFile(path.join(shared, "2026-11.txt"), "utf8")).trimEnd().split("\n");
   assert.equal(concurrentLines.length, 35); // 18 order rows and 17 blank separators.
   concurrentLines.forEach((line, index) => assert(index % 2 === 0 ? line.startsWith(`#${index / 2 + 1},`) : line === ""));
   assert(!(await readdir(shared)).includes(".orders.lock"));
-  console.log("PASS: private monthly TXT records, numbering, Belgrade month/DST, restart deduplication, multiline input, interrupted append recovery, filesystem failures, symlink checks and three concurrent Node processes. No email was sent.");
+  console.log("PASS: short order IDs, forced collisions, legacy UUID records, restart deduplication, private monthly TXT records, numbering, Belgrade month/DST, multiline input, interrupted append recovery, filesystem failures, symlink checks and three concurrent Node processes. No email was sent.");
 } finally {
   // Only remove the exact temporary fixture directory created above.
   const resolved = path.resolve(temp);

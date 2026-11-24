@@ -68,7 +68,11 @@ const records = [];
 const service = createOrderSubmissionService(config, async message => {
   assert(records.some(order => message.subject.endsWith(order.id)));
   sent.push(message);
-}, async order => { records.push(order); return order; });
+}, async order => {
+  const recorded = { ...order, id: "MK-7K9PX2Q" };
+  records.push(recorded);
+  return recorded;
+});
 assert.equal((await handleOrderRequest(request(), null)).status, 503);
 assert.equal(sent.length, 0);
 const response = await handleOrderRequest(request(), service);
@@ -76,7 +80,8 @@ assert.equal(response.status, 200);
 const receipt = await response.json();
 assert.equal(receipt.mode, "live");
 assert.equal(receipt.total, 4400);
-assert.equal(receipt.id, `MK-${payload.requestId.toUpperCase()}`);
+assert.equal(receipt.id, "MK-7K9PX2Q");
+assert(!JSON.stringify(receipt).includes(payload.requestId));
 assert.equal(sent.length, 2);
 const internal = sent.find(message => message.to === config.ordersEmail);
 const customer = sent.find(message => message.to === payload.customer.email);
@@ -106,7 +111,9 @@ assert(!customer.html.includes(`Hvala na porudžbini, ${payload.customer.name}`)
 assert(internal.text.includes(payload.customer.phone));
 assert(!JSON.stringify(receipt).includes(config.password));
 assert(!JSON.stringify(receipt).includes(config.ordersEmail));
-assert.equal((await handleOrderRequest(request(), service)).status, 200);
+const repeated = await handleOrderRequest(request(), service);
+assert.equal(repeated.status, 200);
+assert.equal((await repeated.json()).id, receipt.id);
 assert.equal((await handleOrderRequest(request({ ...payload, requestId: payload.requestId.toUpperCase() }), service)).status, 200);
 assert.equal(sent.length, 2); // Repeated POSTs cannot resend accepted messages in this process.
 assert.equal(records.length, 1);
@@ -164,7 +171,7 @@ for (const failingRecipient of [config.ordersEmail, payload.customer.email, "bot
   const partial = createOrderSubmissionService(config, async message => {
     attempts.push(message);
     if (fail && (message.to === failingRecipient || failingRecipient === "both")) throw Object.assign(new Error(config.password), { code: "EAUTH", response: config.password });
-  }, async order => { recorded++; return order; });
+  }, async order => { recorded++; return { ...order, id: "MK-7K9PX2Q" }; });
   const first = await handleOrderRequest(request(), partial);
   assert.equal(first.status, failingRecipient === payload.customer.email ? 200 : 502);
   assert.equal(attempts.length, 2);
